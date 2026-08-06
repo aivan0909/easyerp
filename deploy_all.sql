@@ -602,122 +602,176 @@ AS $$
   LIMIT 1;
 $$;
 
--- ========== 2. ?ùÂ??ÑË°®?üÁî® RLS ?áÂ??®ÊîøÁ≠?==========
 
--- ‰∏ªÊ??áÂü∫?¨Ë???ALTER TABLE imaa_t ENABLE ROW LEVEL SECURITY;
+-- ========== 2. ?êÂì°?∫Êú¨Ë≥áÊ??áÊ??êË°® RLS ==========
+
+-- [ooag_t] ‰ΩøÁî®?ÖÊ?Ê°àË°®
+ALTER TABLE ooag_t ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ooag_insert_policy ON ooag_t;
+CREATE POLICY ooag_insert_policy ON ooag_t FOR INSERT TO authenticated
+  WITH CHECK (ooagcode = auth.uid()::text);
+
+DROP POLICY IF EXISTS ooag_select_policy ON ooag_t;
+CREATE POLICY ooag_select_policy ON ooag_t FOR SELECT TO authenticated
+  USING (ooagcode = auth.uid()::text);
+
+DROP POLICY IF EXISTS ooag_update_policy ON ooag_t;
+CREATE POLICY ooag_update_policy ON ooag_t FOR UPDATE TO authenticated
+  USING (ooagcode = auth.uid()::text)
+  WITH CHECK (ooagcode = auth.uid()::text);
+
+
+-- [rola_t] ËßíËâ≤Ë°?(?ØË?)
+ALTER TABLE rola_t ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS rola_select_policy ON rola_t;
+CREATE POLICY rola_select_policy ON rola_t FOR SELECT TO authenticated
+  USING (true);
+
+
+-- [rolb_t] ËßíËâ≤Ê®°Á?Ê¨äÈ??éÁ¥∞Ë°?(?ØË?)
+ALTER TABLE rolb_t ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS rolb_select_policy ON rolb_t;
+CREATE POLICY rolb_select_policy ON rolb_t FOR SELECT TO authenticated
+  USING (true);
+
+
+-- [doc_seq_t] ?ÆË?Â∫èË?Ë°?(?ÅË®± authenticated ‰ΩøÁî®?ÖÊñ∞Â¢ûË??¥Êñ∞‰ª•Ë? fn_next_docno ?ã‰?)
+ALTER TABLE doc_seq_t ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS doc_seq_policy ON doc_seq_t;
+CREATE POLICY doc_seq_policy ON doc_seq_t FOR ALL TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+
+-- ========== 3. ?∂‰?Ê•≠Â?Ë°?RLS ?øÁ? (ÁÆ°Á??°ÂèØË¶ãÂÖ®?®Ô?‰∏Ä?¨‰∫∫?ÖÈ??™Â∑±‰ºÅÊ•≠) ==========
+
+-- [imaa_t] ?ÜÂ?Ë°?ALTER TABLE imaa_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS imaa_policy ON imaa_t;
 CREATE POLICY imaa_policy ON imaa_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR imaaent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR imaaent = get_auth_user_ent());
 
-ALTER TABLE cusa_t ENABLE ROW LEVEL SECURITY;
+-- [cusa_t] ÂÆ¢Êà∂Ë°?ALTER TABLE cusa_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cusa_policy ON cusa_t;
 CREATE POLICY cusa_policy ON cusa_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR cusaent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR cusaent = get_auth_user_ent());
 
+-- [vnda_t] ‰æõÊ??ÜË°®
 ALTER TABLE vnda_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS vnda_policy ON vnda_t;
 CREATE POLICY vnda_policy ON vnda_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR vndaent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR vndaent = get_auth_user_ent());
 
-ALTER TABLE inaa_t ENABLE ROW LEVEL SECURITY;
+-- [inaa_t] ?âÂ∫´Ë°?ALTER TABLE inaa_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inaa_policy ON inaa_t;
 CREATE POLICY inaa_policy ON inaa_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR inaaent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR inaaent = get_auth_user_ent());
 
-ALTER TABLE ooag_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY ooag_policy ON ooag_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR ooagent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR ooagent = get_auth_user_ent());
-
-ALTER TABLE rola_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rola_policy ON rola_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR rolaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR rolaent = get_auth_user_ent());
-
-ALTER TABLE rolb_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rolb_policy ON rolb_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR rolbent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR rolbent = get_auth_user_ent());
-
--- ?∑Ë≤®Ê®°Á?
-ALTER TABLE xmda_t ENABLE ROW LEVEL SECURITY;
+-- [xmda_t] ?∑Ë≤®Ë®ÇÂñÆ??ALTER TABLE xmda_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS xmda_policy ON xmda_t;
 CREATE POLICY xmda_policy ON xmda_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR xmdaent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR xmdaent = get_auth_user_ent());
 
-ALTER TABLE xmdc_t ENABLE ROW LEVEL SECURITY;
+-- [xmdc_t] ?∑Ë≤®Ë®ÇÂñÆË∫?ALTER TABLE xmdc_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS xmdc_policy ON xmdc_t;
 CREATE POLICY xmdc_policy ON xmdc_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR xmdcent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR xmdcent = get_auth_user_ent());
 
+-- [xmdk_t] ?∫Ë≤®?ÆÈ†≠
 ALTER TABLE xmdk_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS xmdk_policy ON xmdk_t;
 CREATE POLICY xmdk_policy ON xmdk_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR xmdkent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR xmdkent = get_auth_user_ent());
 
+-- [xmdl_t] ?∫Ë≤®?ÆË∫´
 ALTER TABLE xmdl_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS xmdl_policy ON xmdl_t;
 CREATE POLICY xmdl_policy ON xmdl_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR xmdlent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR xmdlent = get_auth_user_ent());
 
+-- [xrca_t] ?âÊî∂?ÆÈ†≠
 ALTER TABLE xrca_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS xrca_policy ON xrca_t;
 CREATE POLICY xrca_policy ON xrca_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR xrcaent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR xrcaent = get_auth_user_ent());
 
+-- [xrcb_t] ?âÊî∂?ÆË∫´
 ALTER TABLE xrcb_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS xrcb_policy ON xrcb_t;
 CREATE POLICY xrcb_policy ON xrcb_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR xrcbent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR xrcbent = get_auth_user_ent());
 
--- ?°Ë≥ºÊ®°Á?
+-- [pmdl_t] ?°Ë≥º?ÆÈ†≠
 ALTER TABLE pmdl_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS pmdl_policy ON pmdl_t;
 CREATE POLICY pmdl_policy ON pmdl_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR pmdlent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR pmdlent = get_auth_user_ent());
 
+-- [pmdn_t] ?°Ë≥º?ÆË∫´
 ALTER TABLE pmdn_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS pmdn_policy ON pmdn_t;
 CREATE POLICY pmdn_policy ON pmdn_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR pmdnent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR pmdnent = get_auth_user_ent());
 
+-- [pmds_t] ?∂Ë≤®?ÆÈ†≠
 ALTER TABLE pmds_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS pmds_policy ON pmds_t;
 CREATE POLICY pmds_policy ON pmds_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR pmdsent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR pmdsent = get_auth_user_ent());
 
+-- [pmdt_t] ?∂Ë≤®?ÆË∫´
 ALTER TABLE pmdt_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS pmdt_policy ON pmdt_t;
 CREATE POLICY pmdt_policy ON pmdt_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR pmdtent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR pmdtent = get_auth_user_ent());
 
+-- [apca_t] ?â‰??ÆÈ†≠
 ALTER TABLE apca_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS apca_policy ON apca_t;
 CREATE POLICY apca_policy ON apca_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR apcaent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR apcaent = get_auth_user_ent());
 
+-- [apcb_t] ?â‰??ÆË∫´
 ALTER TABLE apcb_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS apcb_policy ON apcb_t;
 CREATE POLICY apcb_policy ON apcb_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR apcbent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR apcbent = get_auth_user_ent());
 
--- Â∫´Â??áÊ†∏??ALTER TABLE inag_t ENABLE ROW LEVEL SECURITY;
+-- [inag_t] Â∫´Â??∞Â?Ê≠∑Âè≤
+ALTER TABLE inag_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inag_policy ON inag_t;
 CREATE POLICY inag_policy ON inag_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR inagent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR inagent = get_auth_user_ent());
 
-ALTER TABLE inaj_t ENABLE ROW LEVEL SECURITY;
+-- [inaj_t] Â∫´Â??æÊ???ALTER TABLE inaj_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inaj_policy ON inaj_t;
 CREATE POLICY inaj_policy ON inaj_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR inajent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR inajent = get_auth_user_ent());
 
+-- [reca_t] ?∏Èä∑?éÁ¥∞
 ALTER TABLE reca_t ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS reca_policy ON reca_t;
 CREATE POLICY reca_policy ON reca_t FOR ALL TO authenticated
   USING (is_auth_user_admin() OR recaent = get_auth_user_ent())
   WITH CHECK (is_auth_user_admin() OR recaent = get_auth_user_ent());
-
--- ?ÆË?Â∫èË?Ë°?(Ê≤íÊ?‰ºÅÊ•≠Ê¨Ñ‰?ÔºåÂ?Ë®±Ê??âÁôª?•Áî®?∂Ë??ñË?‰øÆÊîπ)
-ALTER TABLE doc_seq_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY doc_seq_policy ON doc_seq_t FOR ALL TO authenticated
-  USING (true)
-  WITH CHECK (true);
