@@ -149,3 +149,81 @@ BEGIN
   );
 END;
 $$;
+
+-- ------------------------------------------------------------
+-- 3. 取消確認銷貨訂單
+--    只檢查底下有沒有還在生效中(非作廢)的出貨單引用它，
+--    不涉及庫存還原(訂單本身不影響庫存，出貨才影響)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION void_sales_order(p_ent integer, p_docno varchar, p_user varchar)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_header xmda_t%ROWTYPE;
+  v_active_count integer;
+BEGIN
+  SELECT * INTO v_header FROM xmda_t WHERE xmdaent = p_ent AND xmdadocno = p_docno FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'NOT_FOUND: 訂單不存在 %', p_docno;
+  END IF;
+  IF v_header.xmdastatus = '9' THEN
+    RAISE EXCEPTION 'ALREADY_VOIDED: 此訂單已經作廢過了';
+  END IF;
+
+  SELECT count(*) INTO v_active_count FROM xmdk_t
+  WHERE xmdkent = p_ent AND xmdk005 = p_docno AND xmdkstatus <> '9';
+
+  IF v_active_count > 0 THEN
+    RAISE EXCEPTION 'HAS_ACTIVE_SHIPMENT: 此訂單底下還有 % 張生效中的出貨單，請先取消/作廢那些出貨單才能取消此訂單', v_active_count;
+  END IF;
+
+  UPDATE xmda_t SET xmdastatus = '9', xmdavoidid = p_user, xmdavoiddt = now()
+  WHERE xmdaent = p_ent AND xmdadocno = p_docno;
+
+  RETURN jsonb_build_object('docno', p_docno, 'status', 'voided');
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- 4. 取消確認採購單(對稱)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION void_purchase_order(p_ent integer, p_docno varchar, p_user varchar)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_header pmdl_t%ROWTYPE;
+  v_active_count integer;
+BEGIN
+  SELECT * INTO v_header FROM pmdl_t WHERE pmdlent = p_ent AND pmdldocno = p_docno FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'NOT_FOUND: 採購單不存在 %', p_docno;
+  END IF;
+  IF v_header.pmdlstatus = '9' THEN
+    RAISE EXCEPTION 'ALREADY_VOIDED: 此採購單已經作廢過了';
+  END IF;
+
+  SELECT count(*) INTO v_active_count FROM pmds_t
+  WHERE pmdsent = p_ent AND pmds002 = p_docno AND pmdsstatus <> '9';
+
+  IF v_active_count > 0 THEN
+    RAISE EXCEPTION 'HAS_ACTIVE_RECEIPT: 此採購單底下還有 % 張生效中的收貨單，請先取消/作廢那些收貨單才能取消此採購單', v_active_count;
+  END IF;
+
+  UPDATE pmdl_t SET pmdlstatus = '9', pmdlvoidid = p_user, pmdlvoiddt = now()
+  WHERE pmdlent = p_ent AND pmdldocno = p_docno;
+
+  RETURN jsonb_build_object('docno', p_docno, 'status', 'voided');
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- 5. 給前端列表用的「排除作廢」View
+--    Antigravity 開發列表畫面時建議查這些 View 而非原始表，
+--    這樣作廢的單據就不會出現在畫面上，不用每個查詢都手動加 WHERE status<>'9'
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW xmda_active_v WITH (security_invoker = true) AS SELECT * FROM xmda_t WHERE xmdastatus <> '9';
+CREATE OR REPLACE VIEW xmdk_active_v WITH (security_invoker = true) AS SELECT * FROM xmdk_t WHERE xmdkstatus <> '9';
+CREATE OR REPLACE VIEW pmdl_active_v WITH (security_invoker = true) AS SELECT * FROM pmdl_t WHERE pmdlstatus <> '9';
+CREATE OR REPLACE VIEW pmds_active_v WITH (security_invoker = true) AS SELECT * FROM pmds_t WHERE pmdsstatus <> '9';

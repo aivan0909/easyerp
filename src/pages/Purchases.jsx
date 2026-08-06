@@ -36,7 +36,7 @@ export default function Purchases({ userDetails }) {
     setErrorMsg('');
     try {
       if (activeTab === 'orders') {
-        let q = supabase.from('pmdl_t').select('*').order('pmdldocdt', { ascending: false });
+        let q = supabase.from('pmdl_active_v').select('*').order('pmdldocdt', { ascending: false });
         if (!isAdmin) q = q.eq('pmdlent', ent);
         const { data: purchaseOrders } = await q;
 
@@ -49,7 +49,7 @@ export default function Purchases({ userDetails }) {
         }));
         setOrders(ordersWithLines);
       } else if (activeTab === 'receipts') {
-        let q = supabase.from('pmds_t').select('*').order('pmdsdocdt', { ascending: false });
+        let q = supabase.from('pmds_active_v').select('*').order('pmdsdocdt', { ascending: false });
         if (!isAdmin) q = q.eq('pmdsent', ent);
         const { data: grList } = await q;
 
@@ -304,6 +304,40 @@ export default function Purchases({ userDetails }) {
     }
   }
 
+  // --- 核心 RPC: 取消採購單 (作廢) ---
+  async function handleVoidOrder(docNo) {
+    if (!window.confirm(`確定要取消採購單 ${docNo} 嗎？此操作將會作廢採購單，且無法復原。`)) return;
+
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const { data, error } = await supabase.rpc('void_purchase_order', {
+        p_ent: ent,
+        p_docno: docNo,
+        p_user: userDetails.ooagcode
+      });
+
+      if (error) {
+        let friendlyMsg = error.message;
+        if (error.message.includes('HAS_ACTIVE_RECEIPT')) {
+          friendlyMsg = '此單底下還有生效中的收貨單，請先取消那些單據';
+        } else if (error.message.includes('ALREADY_VOIDED')) {
+          friendlyMsg = '此單已作廢';
+        }
+        setErrorMsg('取消採購單失敗: ' + friendlyMsg);
+      } else {
+        setSuccessMsg(`採購單 ${docNo} 已成功作廢！`);
+        fetchData();
+      }
+    } catch (err) {
+      setErrorMsg('連線異常: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
@@ -384,6 +418,18 @@ export default function Purchases({ userDetails }) {
                           </div>
                         ))}
                       </div>
+
+                      {/* 按鈕區域 */}
+                      {order.pmdlstatus === '1' && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleVoidOrder(order.pmdldocno)}
+                            style={{ border: '1px solid #ef4444', color: '#ef4444', background: 'transparent', padding: '8px 16px', fontSize: '13px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            取消確認
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}

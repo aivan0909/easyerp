@@ -578,11 +578,11 @@ $$;
 -- ============================================================
 
 -- ?¶è²¨?®é ­ï¼šè?ä½œå»¢??ä½œå»¢?‚é?
-ALTER TABLE pmds_t ADD COLUMN IF NOT EXISTS pmdsvoidid  varchar(80);
+ALTER TABLE pmds_t ADD COLUMN IF NOT EXISTS pmdsvoidid  varchar(20);
 ALTER TABLE pmds_t ADD COLUMN IF NOT EXISTS pmdsvoiddt  timestamptz;
 
 -- ?ºè²¨?®é ­ï¼šè?ä½œå»¢??ä½œå»¢?‚é?(å°ç¨±)
-ALTER TABLE xmdk_t ADD COLUMN IF NOT EXISTS xmdkvoidid  varchar(80);
+ALTER TABLE xmdk_t ADD COLUMN IF NOT EXISTS xmdkvoidid  varchar(20);
 ALTER TABLE xmdk_t ADD COLUMN IF NOT EXISTS xmdkvoiddt  timestamptz;
 
 -- ?‰ä?å¸³æ¬¾?®é ­ï¼šå???demo ?ˆç²¾ç°¡æ?äº?statusï¼Œé€™è£¡è£œä?
@@ -590,6 +590,14 @@ ALTER TABLE apca_t ADD COLUMN IF NOT EXISTS apcastatus  varchar(10) DEFAULT '1';
 
 -- ?‰æ”¶å¸³æ¬¾?®é ­ï¼šå?ä¸Šï?è£œä? status(å°ç¨±)
 ALTER TABLE xrca_t ADD COLUMN IF NOT EXISTS xrcastatus  varchar(10) DEFAULT '1';
+
+-- ?·è²¨è¨‚å–®?­ï?è£œä?å»¢è€?ä½œå»¢?‚é?
+ALTER TABLE xmda_t ADD COLUMN IF NOT EXISTS xmdavoidid  varchar(80);
+ALTER TABLE xmda_t ADD COLUMN IF NOT EXISTS xmdavoiddt  timestamptz;
+
+-- ?¡è³¼?®é ­ï¼šè?ä½œå»¢??ä½œå»¢?‚é?(å°ç¨±)
+ALTER TABLE pmdl_t ADD COLUMN IF NOT EXISTS pmdlvoidid  varchar(80);
+ALTER TABLE pmdl_t ADD COLUMN IF NOT EXISTS pmdlvoiddt  timestamptz;
 -- ============================================================
 -- void_functions.sql ???–æ?ç¢ºè?/ä½œå»¢?Ÿèƒ½
 -- ?¨ç½²?†å?ï¼šschema.sql -> functions.sql -> migration_void.sql -> void_functions.sql
@@ -731,6 +739,84 @@ BEGIN
   );
 END;
 $$;
+
+-- ------------------------------------------------------------
+-- 3. ?–æ?ç¢ºè??·è²¨è¨‚å–®
+--    ?ªæª¢?¥å?ä¸‹æ?æ²’æ??„åœ¨?Ÿæ?ä¸??ä?å»??„å‡ºè²¨å–®å¼•ç”¨å®ƒï?
+--    ä¸æ??Šåº«å­˜é???è¨‚å–®?¬èº«ä¸å½±?¿åº«å­˜ï??ºè²¨?å½±??
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION void_sales_order(p_ent integer, p_docno varchar, p_user varchar)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_header xmda_t%ROWTYPE;
+  v_active_count integer;
+BEGIN
+  SELECT * INTO v_header FROM xmda_t WHERE xmdaent = p_ent AND xmdadocno = p_docno FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'NOT_FOUND: è¨‚å–®ä¸å???%', p_docno;
+  END IF;
+  IF v_header.xmdastatus = '9' THEN
+    RAISE EXCEPTION 'ALREADY_VOIDED: æ­¤è??®å·²ç¶“ä?å»¢é?äº?;
+  END IF;
+
+  SELECT count(*) INTO v_active_count FROM xmdk_t
+  WHERE xmdkent = p_ent AND xmdk005 = p_docno AND xmdkstatus <> '9';
+
+  IF v_active_count > 0 THEN
+    RAISE EXCEPTION 'HAS_ACTIVE_SHIPMENT: æ­¤è??®å?ä¸‹é???% å¼µç??ˆä¸­?„å‡ºè²¨å–®ï¼Œè??ˆå?æ¶?ä½œå»¢????ºè²¨?®æ??½å?æ¶ˆæ­¤è¨‚å–®', v_active_count;
+  END IF;
+
+  UPDATE xmda_t SET xmdastatus = '9', xmdavoidid = p_user, xmdavoiddt = now()
+  WHERE xmdaent = p_ent AND xmdadocno = p_docno;
+
+  RETURN jsonb_build_object('docno', p_docno, 'status', 'voided');
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- 4. ?–æ?ç¢ºè??¡è³¼??å°ç¨±)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION void_purchase_order(p_ent integer, p_docno varchar, p_user varchar)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_header pmdl_t%ROWTYPE;
+  v_active_count integer;
+BEGIN
+  SELECT * INTO v_header FROM pmdl_t WHERE pmdlent = p_ent AND pmdldocno = p_docno FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'NOT_FOUND: ?¡è³¼?®ä?å­˜åœ¨ %', p_docno;
+  END IF;
+  IF v_header.pmdlstatus = '9' THEN
+    RAISE EXCEPTION 'ALREADY_VOIDED: æ­¤æ¡è³¼å–®å·²ç?ä½œå»¢?ä?';
+  END IF;
+
+  SELECT count(*) INTO v_active_count FROM pmds_t
+  WHERE pmdsent = p_ent AND pmds002 = p_docno AND pmdsstatus <> '9';
+
+  IF v_active_count > 0 THEN
+    RAISE EXCEPTION 'HAS_ACTIVE_RECEIPT: æ­¤æ¡è³¼å–®åº•ä??„æ? % å¼µç??ˆä¸­?„æ”¶è²¨å–®ï¼Œè??ˆå?æ¶?ä½œå»¢????¶è²¨?®æ??½å?æ¶ˆæ­¤?¡è³¼??, v_active_count;
+  END IF;
+
+  UPDATE pmdl_t SET pmdlstatus = '9', pmdlvoidid = p_user, pmdlvoiddt = now()
+  WHERE pmdlent = p_ent AND pmdldocno = p_docno;
+
+  RETURN jsonb_build_object('docno', p_docno, 'status', 'voided');
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- 5. çµ¦å?ç«¯å?è¡¨ç”¨?„ã€Œæ??¤ä?å»¢ã€View
+--    Antigravity ?‹ç™¼?—è¡¨?«é¢?‚å»ºè­°æŸ¥?™ä? View ?Œé??Ÿå?è¡¨ï?
+--    ?™æ¨£ä½œå»¢?„å–®?šå°±ä¸æ??ºç¾?¨ç•«?¢ä?ï¼Œä??¨æ??‹æŸ¥è©¢éƒ½?‹å???WHERE status<>'9'
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW xmda_active_v WITH (security_invoker = true) AS SELECT * FROM xmda_t WHERE xmdastatus <> '9';
+CREATE OR REPLACE VIEW xmdk_active_v WITH (security_invoker = true) AS SELECT * FROM xmdk_t WHERE xmdkstatus <> '9';
+CREATE OR REPLACE VIEW pmdl_active_v WITH (security_invoker = true) AS SELECT * FROM pmdl_t WHERE pmdlstatus <> '9';
+CREATE OR REPLACE VIEW pmds_active_v WITH (security_invoker = true) AS SELECT * FROM pmds_t WHERE pmdsstatus <> '9';
 -- ============================================================
 -- ERP ç³»çµ± ??Row Level Security (RLS) ?¿ç?
 -- ============================================================

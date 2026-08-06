@@ -36,7 +36,7 @@ export default function Sales({ userDetails }) {
     setErrorMsg('');
     try {
       if (activeTab === 'orders') {
-        let q = supabase.from('xmda_t').select('*').order('xmdadocdt', { ascending: false });
+        let q = supabase.from('xmda_active_v').select('*').order('xmdadocdt', { ascending: false });
         if (!isAdmin) q = q.eq('xmdaent', ent);
         const { data: salesOrders } = await q;
 
@@ -49,7 +49,7 @@ export default function Sales({ userDetails }) {
         }));
         setOrders(ordersWithLines);
       } else if (activeTab === 'shipments') {
-        let q = supabase.from('xmdk_t').select('*').order('xmdkdocdt', { ascending: false });
+        let q = supabase.from('xmdk_active_v').select('*').order('xmdkdocdt', { ascending: false });
         if (!isAdmin) q = q.eq('xmdkent', ent);
         const { data: shList } = await q;
 
@@ -307,6 +307,40 @@ export default function Sales({ userDetails }) {
     }
   }
 
+  // --- 核心 RPC: 取消銷貨訂單 (作廢) ---
+  async function handleVoidOrder(docNo) {
+    if (!window.confirm(`確定要取消訂單 ${docNo} 嗎？此操作將會作廢訂單，且無法復原。`)) return;
+
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const { data, error } = await supabase.rpc('void_sales_order', {
+        p_ent: ent,
+        p_docno: docNo,
+        p_user: userDetails.ooagcode
+      });
+
+      if (error) {
+        let friendlyMsg = error.message;
+        if (error.message.includes('HAS_ACTIVE_SHIPMENT')) {
+          friendlyMsg = '此單底下還有生效中的出貨單，請先取消那些單據';
+        } else if (error.message.includes('ALREADY_VOIDED')) {
+          friendlyMsg = '此單已作廢';
+        }
+        setErrorMsg('取消訂單失敗: ' + friendlyMsg);
+      } else {
+        setSuccessMsg(`訂單 ${docNo} 已成功作廢！`);
+        fetchData();
+      }
+    } catch (err) {
+      setErrorMsg('連線異常: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
@@ -387,6 +421,18 @@ export default function Sales({ userDetails }) {
                           </div>
                         ))}
                       </div>
+
+                      {/* 按鈕區域 */}
+                      {order.xmdastatus === '1' && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleVoidOrder(order.xmdadocno)}
+                            style={{ border: '1px solid #ef4444', color: '#ef4444', background: 'transparent', padding: '8px 16px', fontSize: '13px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            取消確認
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
