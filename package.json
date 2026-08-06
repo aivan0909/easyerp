@@ -1,0 +1,29 @@
+{
+  "name": "easy-erp",
+  "version": "1.0.0",
+  "description": "已在本機 PostgreSQL 16 完整測試通過（含成功案例與庫存不足的 rollback 案例），可以直接部署到 Supabase。",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.1",
+    "dotenv": "^17.4.2",
+    "lucide-react": "^1.28.0",
+    "pg": "^8.22.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "vite": "^8.2.0"
+  }
+}
