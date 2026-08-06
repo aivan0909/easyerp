@@ -14,7 +14,8 @@ export default function Accounts({ userDetails }) {
   // 新增帳號表單
   const [showAddModal, setShowAddModal] = useState(false);
   const [newAccount, setNewAccount] = useState({
-    code: '', // uuid
+    email: '',
+    password: '',
     name: '',
     role: 'STAFF',
     enterprise: userDetails.ooagent
@@ -71,28 +72,29 @@ export default function Accounts({ userDetails }) {
 
   async function handleCreateAccount(e) {
     e.preventDefault();
-    if (!newAccount.code || !newAccount.name) return alert('請填寫完整帳號資訊');
+    if (!newAccount.email || !newAccount.password || !newAccount.name) return alert('請填寫完整帳號資訊');
 
     setLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
 
     try {
-      // 1. 在 ooag_t 插入對應帳號
-      const { error } = await supabase.from('ooag_t').insert({
-        ooagent: parseInt(newAccount.enterprise),
-        ooagcode: newAccount.code.trim(),
-        ooag001: newAccount.name.trim(),
-        ooag003: newAccount.role,
-        ooag004: 'obsidian', // 預設主題
-        ooagstatus: '1'
+      // 呼叫 Edge Function
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email: newAccount.email.trim(),
+          password: newAccount.password,
+          name: newAccount.name.trim(),
+          roleCode: newAccount.role
+        }
       });
 
       if (error) throw error;
+      if (data && data.error) throw new Error(data.error);
 
-      setSuccessMsg(`帳號 ${newAccount.name} 建立成功！該使用者現在可以使用對應的 Auth ID 登入。`);
+      setSuccessMsg(`帳號 ${newAccount.name} 建立成功！`);
       setShowAddModal(false);
-      setNewAccount({ code: '', name: '', role: 'STAFF', enterprise: ent });
+      setNewAccount({ email: '', password: '', name: '', role: 'STAFF', enterprise: ent });
       fetchData();
     } catch (err) {
       setErrorMsg('建立帳號失敗: ' + err.message);
@@ -164,7 +166,7 @@ export default function Accounts({ userDetails }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                      <th style={{ padding: '12px 8px' }}>姓名</th>
+                      <th style={{ padding: '12px 8px' }}>姓名 / Email</th>
                       <th style={{ padding: '12px 8px' }}>企業編號</th>
                       <th style={{ padding: '12px 8px' }}>角色代碼</th>
                       <th style={{ padding: '12px 8px' }}>主題偏好</th>
@@ -181,7 +183,12 @@ export default function Accounts({ userDetails }) {
                         <tr key={u.ooagcode} style={{ borderBottom: '1px solid var(--border-color)' }}>
                           <td style={{ padding: '12px 8px' }}>
                             <div style={{ fontWeight: 600 }}>{u.ooag001}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>ID: {u.ooagcode}</div>
+                            {u.ooag006 && (
+                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                {u.ooag006}
+                              </div>
+                            )}
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>ID: {u.ooagcode}</div>
                           </td>
                           <td style={{ padding: '12px 8px' }}>企業 {u.ooagent}</td>
                           <td style={{ padding: '12px 8px' }}>{u.ooag003}</td>
@@ -274,14 +281,26 @@ export default function Accounts({ userDetails }) {
             <form onSubmit={handleCreateAccount} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  使用者 Auth ID (對應 Supabase auth.users.id)
+                  登入 Email (使用者帳號)
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   required
-                  placeholder="輸入 UUID 字串"
-                  value={newAccount.code}
-                  onChange={(e) => setNewAccount({ ...newAccount, code: e.target.value })}
+                  placeholder="new@example.com"
+                  value={newAccount.email}
+                  onChange={(e) => setNewAccount({ ...newAccount, email: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>密碼</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  placeholder="設定登入密碼"
+                  value={newAccount.password}
+                  onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
                 />
               </div>
 

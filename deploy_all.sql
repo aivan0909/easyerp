@@ -1026,6 +1026,57 @@ FROM xmdl_t l
 JOIN xmdk_t k ON k.xmdkent = l.xmdlent AND k.xmdkdocno = l.xmdldocno
 WHERE k.xmdkstatus = '1';
 -- ============================================================
+-- migration_user_email.sql ??è®?ooag_t ?½é¡¯ç¤ºç™»?¥ç”¨??email
+-- ?¨ç½²?†å?ï¼?.. -> cost_functions.sql -> migration_user_email.sql
+--
+-- ?Œæ™¯ï¼šauth.users(Supabase Auth ?§å»ºè¡?å­˜æ”¾ email/å¯†ç¢¼ï¼Œå?ç«¯ç„¡æ³•ç›´?¥æŸ¥è©¢ã€?-- è§??ï¼šooag_t è£œä???email æ¬„ä?ï¼Œç”¨è§¸ç™¼?¨åœ¨ä½¿ç”¨?…è¨»???»å…¥?‚è‡ª?•å?æ­¥é?ä¾†ã€?-- ============================================================
+
+-- 1) ooag_t è£?email æ¬„ä?
+ALTER TABLE ooag_t ADD COLUMN IF NOT EXISTS ooag006 varchar(255);
+CREATE INDEX IF NOT EXISTS ooag_email_ix ON ooag_t (ooag006);
+
+-- 2) è§¸ç™¼?¨å‡½å¼ï?auth.users ?°å?ä½¿ç”¨?…æ?ï¼Œè‡ª?•åœ¨ ooag_t å»ºç?/?´æ–°å°æ?è³‡æ?
+--    SECURITY DEFINERï¼šä»¥å»ºç?æ­¤å‡½å¼è€??šå¸¸?¯è??™åº«ç®¡ç????„æ??åŸ·è¡Œï?
+--    ?™æ¨£?èƒ½ç¹é? ooag_t ??RLS ?åˆ¶å¯«å…¥è³‡æ?(ä¸€?¬ä½¿?¨è€…ä??½è‡ªå·±å¯«??ooag_t)
+CREATE OR REPLACE FUNCTION handle_new_auth_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO ooag_t (ooagent, ooagcode, ooag001, ooag006, ooagstatus)
+  VALUES (1, NEW.id::text, split_part(NEW.email, '@', 1), NEW.email, '1')
+  ON CONFLICT (ooagent, ooagcode) DO UPDATE SET ooag006 = EXCLUDED.ooag006;
+  RETURN NEW;
+END;
+$$;
+
+-- 3) ?›ä?è§¸ç™¼?¨ï?æ¯æ¬¡ auth.users ?°å?ä¸€ç­†ï?å°±è‡ª?•è§¸?¼ä??¢ç??½å?
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_auth_user();
+
+-- 4) ä½¿ç”¨?…ç™»?¥æ??Œæ­¥?´æ–°?€å¾Œç™»?¥æ??“è?(?¥æ?è®Šæ›´?? email
+CREATE OR REPLACE FUNCTION handle_auth_user_login()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE ooag_t SET ooag005 = now(), ooag006 = NEW.email
+  WHERE ooagent = 1 AND ooagcode = NEW.id::text;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_login ON auth.users;
+CREATE TRIGGER on_auth_user_login
+  AFTER UPDATE OF last_sign_in_at ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_auth_user_login();
+-- ============================================================
 -- ERP ç³»çµ± ??Row Level Security (RLS) ?¿ç?
 -- ============================================================
 
