@@ -135,13 +135,15 @@ export default function Sales({ userDetails }) {
       // 1. 生成訂單單號
       const docNo = 'SO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000);
       
-      // 2. 插入單頭
+      // 2. 插入單頭 (一步到位直接確認)
       const { error: headErr } = await supabase.from('xmda_t').insert({
         xmdaent: ent,
         xmdadocno: docNo,
         xmda002: newOrder.salesperson,
         xmda004: newOrder.customer,
-        xmdastatus: '0' // 草稿
+        xmdastatus: '1', // 直接確認
+        xmdacnfid: userDetails.ooagcode,
+        xmdacnfdt: new Date().toISOString()
       });
 
       if (headErr) throw headErr;

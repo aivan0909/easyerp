@@ -5,7 +5,8 @@ import Sales from './pages/Sales';
 import Purchases from './pages/Purchases';
 import Stock from './pages/Stock';
 import Accounts from './pages/Accounts';
-import { LayoutDashboard, ShoppingBag, Truck, Package, Users, Settings, LogOut, Palette, Menu, X } from 'lucide-react';
+import MasterData from './pages/MasterData';
+import { LayoutDashboard, ShoppingBag, Truck, Package, Users, Settings, LogOut, Palette, Menu, X, Database } from 'lucide-react';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -339,6 +340,15 @@ export default function App() {
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'inline-block' }}>
               Hi, <strong style={{ color: 'var(--text-primary)' }}>{userDetails?.ooag001}</strong>
             </span>
+            {userDetails?.isAdmin && (
+              <button 
+                onClick={() => setActiveTab('accounts')} 
+                style={{ background: 'transparent', color: activeTab === 'accounts' ? 'var(--color-primary)' : 'var(--text-secondary)', padding: '6px' }} 
+                title="帳號管理"
+              >
+                <Users size={18} />
+              </button>
+            )}
             <button onClick={handleSignOut} style={{ background: 'transparent', color: '#ef4444', padding: '6px' }} title="登出">
               <LogOut size={18} />
             </button>
@@ -381,6 +391,14 @@ export default function App() {
             <Package size={18} /> <span style={{ fontWeight: activeTab === 'stock' ? 600 : 400 }}>庫存查詢</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('masterdata')}
+            className={`nav-item ${activeTab === 'masterdata' ? 'active' : ''}`}
+            style={{ width: '100%', display: 'flex', flexDirection: 'row', gap: '12px', alignItems: 'center', padding: '12px', borderRadius: '8px', fontSize: '14px', background: activeTab === 'masterdata' ? 'var(--bg-tertiary)' : 'transparent' }}
+          >
+            <Database size={18} /> <span style={{ fontWeight: activeTab === 'masterdata' ? 600 : 400 }}>基本資料</span>
+          </button>
+
           {userDetails?.isAdmin && (
             <button
               onClick={() => setActiveTab('accounts')}
@@ -398,11 +416,12 @@ export default function App() {
           {activeTab === 'sales' && <Sales userDetails={userDetails} />}
           {activeTab === 'purchases' && <Purchases userDetails={userDetails} />}
           {activeTab === 'stock' && <Stock userDetails={userDetails} />}
+          {activeTab === 'masterdata' && <MasterData userDetails={userDetails} />}
           {activeTab === 'accounts' && <Accounts userDetails={userDetails} />}
         </main>
       </div>
 
-      {/* Bottom Nav Bar (手機端底部固定導覽) */}
+      {/* Bottom Nav Bar (手機端底部固定導覽，固定 5 個高頻主要入口) */}
       <nav className="bottom-nav">
         <button onClick={() => setActiveTab('dashboard')} className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
           <LayoutDashboard size={20} />
@@ -420,12 +439,10 @@ export default function App() {
           <Package size={20} />
           <span>庫存</span>
         </button>
-        {userDetails?.isAdmin && (
-          <button onClick={() => setActiveTab('accounts')} className={`nav-item ${activeTab === 'accounts' ? 'active' : ''}`}>
-            <Users size={20} />
-            <span>帳號</span>
-          </button>
-        )}
+        <button onClick={() => setActiveTab('masterdata')} className={`nav-item ${activeTab === 'masterdata' ? 'active' : ''}`}>
+          <Database size={20} />
+          <span>基本資料</span>
+        </button>
       </nav>
 
     </div>

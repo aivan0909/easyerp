@@ -134,12 +134,14 @@ export default function Purchases({ userDetails }) {
     try {
       const docNo = 'PO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000);
 
-      // 1. 插入單頭
+      // 1. 插入單頭 (一步到位直接審核)
       const { error: headErr } = await supabase.from('pmdl_t').insert({
         pmdlent: ent,
         pmdldocno: docNo,
         pmdl004: newOrder.vendor,
-        pmdlstatus: '0'
+        pmdlstatus: '1', // 直接確認
+        pmdlcnfid: userDetails.ooagcode,
+        pmdlcnfdt: new Date().toISOString()
       });
       if (headErr) throw headErr;
 
