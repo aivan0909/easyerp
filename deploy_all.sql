@@ -93,7 +93,7 @@ CREATE TABLE xmda_t (
   xmdadocdt  date DEFAULT current_date,
   xmda002    varchar(20),  -- æ¥­å?äººå“¡
   xmda004    varchar(20),  -- å®¢æˆ¶ç·¨è?
-  xmdacnfid  varchar(20), xmdacnfdt timestamptz,
+  xmdacnfid  varchar(80), xmdacnfdt timestamptz,
   xmdastatus varchar(10) DEFAULT '0', -- 0?‰ç¨¿ 1å·²ç¢ºèª?  PRIMARY KEY (xmdaent, xmdadocno)
 );
 
@@ -117,7 +117,7 @@ CREATE TABLE xmdk_t (
   xmdk004    varchar(20), -- å®¢æˆ¶ç·¨è?
   xmdk005    varchar(20), -- ä¾†æ?è¨‚å–®?®è?
   xmdk006    varchar(10), -- ?ºè²¨?‰åº«ä»?¢¼
-  xmdkcnfid  varchar(20), xmdkcnfdt timestamptz,
+  xmdkcnfid  varchar(80), xmdkcnfdt timestamptz,
   xmdkstatus varchar(10) DEFAULT '0',
   PRIMARY KEY (xmdkent, xmdkdocno)
 );
@@ -164,7 +164,7 @@ CREATE TABLE pmdl_t (
   pmdlent    integer NOT NULL,
   pmdldocno  varchar(20) NOT NULL,
   pmdldocdt  date DEFAULT current_date,
-  pmdl004    varchar(20),  -- ä¾›æ??†ç·¨??  pmdlcnfid  varchar(20), pmdlcnfdt timestamptz,
+  pmdl004    varchar(20),  -- ä¾›æ??†ç·¨??  pmdlcnfid  varchar(80), pmdlcnfdt timestamptz,
   pmdlstatus varchar(10) DEFAULT '0',
   PRIMARY KEY (pmdlent, pmdldocno)
 );
@@ -188,7 +188,7 @@ CREATE TABLE pmds_t (
   pmdsdocdt  date DEFAULT current_date,
   pmds002    varchar(20), -- ä¾†æ??¡è³¼?®è?
   pmds003    varchar(20), -- ä¾›æ??†ç·¨??  pmds004    varchar(10), -- ?¶è²¨?‰åº«ä»?¢¼
-  pmdscnfid  varchar(20), pmdscnfdt timestamptz,
+  pmdscnfid  varchar(80), pmdscnfdt timestamptz,
   pmdsstatus varchar(10) DEFAULT '0',
   PRIMARY KEY (pmdsent, pmdsdocno)
 );
