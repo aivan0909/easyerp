@@ -23,14 +23,14 @@ export default function Dashboard({ userDetails }) {
   async function fetchDashboardData() {
     setLoading(true);
     try {
-      // 1. 計算應收帳款總額
-      let receivablesQuery = supabase.from('xrca_t').select('xrca003');
+      // 1. 計算應收帳款總額 (排除作廢)
+      let receivablesQuery = supabase.from('xrca_t').select('xrca003').neq('xrcastatus', '9');
       if (!isAdmin) receivablesQuery = receivablesQuery.eq('xrcaent', ent);
       const { data: receivablesData } = await receivablesQuery;
       const receivablesTotal = (receivablesData || []).reduce((sum, item) => sum + parseFloat(item.xrca003 || 0), 0);
 
-      // 2. 計算應付帳款總額
-      let payablesQuery = supabase.from('apca_t').select('apca003');
+      // 2. 計算應付帳款總額 (排除作廢)
+      let payablesQuery = supabase.from('apca_t').select('apca003').neq('apcastatus', '9');
       if (!isAdmin) payablesQuery = payablesQuery.eq('apcaent', ent);
       const { data: payablesData } = await payablesQuery;
       const payablesTotal = (payablesData || []).reduce((sum, item) => sum + parseFloat(item.apca003 || 0), 0);
@@ -64,14 +64,14 @@ export default function Dashboard({ userDetails }) {
         warnings: warnCount
       });
 
-      // 4. 取得最近 5 筆銷貨訂單
-      let salesQuery = supabase.from('xmda_t').select('*').order('xmdadocdt', { ascending: false }).limit(5);
+      // 4. 取得最近 5 筆銷貨訂單 (使用 View 自動排除作廢)
+      let salesQuery = supabase.from('xmda_active_v').select('*').order('xmdadocdt', { ascending: false }).limit(5);
       if (!isAdmin) salesQuery = salesQuery.eq('xmdaent', ent);
       const { data: sales } = await salesQuery;
       setRecentSales(sales || []);
 
-      // 5. 取得最近 5 筆採購單
-      let purchasesQuery = supabase.from('pmdl_t').select('*').order('pmdldocdt', { ascending: false }).limit(5);
+      // 5. 取得最近 5 筆採購單 (使用 View 自動排除作廢)
+      let purchasesQuery = supabase.from('pmdl_active_v').select('*').order('pmdldocdt', { ascending: false }).limit(5);
       if (!isAdmin) purchasesQuery = purchasesQuery.eq('pmdlent', ent);
       const { data: purchases } = await purchasesQuery;
       setRecentPurchases(purchases || []);
