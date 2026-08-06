@@ -273,6 +273,40 @@ export default function Sales({ userDetails }) {
     }
   }
 
+  // --- 核心 RPC: 取消出貨 (作廢) ---
+  async function handleVoidShipment(docNo) {
+    if (!window.confirm(`確定要取消出貨單 ${docNo} 嗎？此操作將會扣減加回的庫存、作廢對應的應收帳款，且無法復原。`)) return;
+
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const { data, error } = await supabase.rpc('void_shipment', {
+        p_ent: ent,
+        p_docno: docNo,
+        p_user: userDetails.ooagcode
+      });
+
+      if (error) {
+        let friendlyMsg = error.message;
+        if (error.message.includes('STOCK_ALREADY_CONSUMED') || error.message.includes('AR_ALREADY_PAID')) {
+          friendlyMsg = '此單無法直接取消，請聯繫管理員走退貨流程';
+        } else if (error.message.includes('DOC_NOT_CONFIRMED')) {
+          friendlyMsg = '此單尚未確認或已作廢';
+        }
+        setErrorMsg('取消出貨失敗: ' + friendlyMsg);
+      } else {
+        setSuccessMsg(`出貨單 ${docNo} 已成功作廢！`);
+        fetchData();
+      }
+    } catch (err) {
+      setErrorMsg('連線異常: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
@@ -374,41 +408,69 @@ export default function Sales({ userDetails }) {
             {loading ? <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>正在處理...</div> : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {shipments.length === 0 ? <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>暫無出貨單記錄</div> : (
-                  shipments.map(sh => (
-                    <div key={sh.xmdkdocno} className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '15px' }}>{sh.xmdkdocno}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                            日期: {sh.xmdkdocdt} | 來源單: {sh.xmdk005} | 倉庫: {sh.xmdk006}
+                  shipments.map(sh => {
+                    const isVoided = sh.xmdkstatus === '9';
+                    return (
+                      <div 
+                        key={sh.xmdkdocno} 
+                        className="glass-panel" 
+                        style={{ 
+                          padding: '16px', 
+                          border: '1px solid var(--border-color)', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '12px',
+                          opacity: isVoided ? 0.6 : 1,
+                          background: isVoided ? 'rgba(128,128,128,0.05)' : 'var(--bg-panel)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ textDecoration: isVoided ? 'line-through' : 'none' }}>
+                            <div style={{ fontWeight: 600, fontSize: '15px' }}>{sh.xmdkdocno}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                              日期: {sh.xmdkdocdt} | 來源單: {sh.xmdk005} | 倉庫: {sh.xmdk006}
+                            </div>
                           </div>
+                          <span className={`badge ${isVoided ? 'badge-voided' : sh.xmdkstatus === '1' ? 'badge-confirmed' : 'badge-draft'}`}>
+                            {isVoided ? '已作廢' : sh.xmdkstatus === '1' ? '已出貨' : '未出貨'}
+                          </span>
                         </div>
-                        <span className={`badge ${sh.xmdkstatus === '1' ? 'badge-confirmed' : 'badge-draft'}`}>
-                          {sh.xmdkstatus === '1' ? '已出貨' : '未出貨'}
-                        </span>
-                      </div>
 
-                      {/* 出貨明細 */}
-                      <div style={{ background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '8px', fontSize: '13px' }}>
-                        {sh.lines.map(line => (
-                          <div key={line.xmdlseq} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                            <span>{line.xmdl001} (出貨量: {line.xmdl002} 片)</span>
-                            <span style={{ fontWeight: 600 }}>${parseFloat(line.xmdl004).toLocaleString()}</span>
-                          </div>
-                        ))}
-                      </div>
+                        {/* 出貨明細 */}
+                        <div style={{ background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '8px', fontSize: '13px', textDecoration: isVoided ? 'line-through' : 'none' }}>
+                          {sh.lines.map(line => (
+                            <div key={line.xmdlseq} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                              <span>{line.xmdl001} (出貨量: {line.xmdl002} 片)</span>
+                              <span style={{ fontWeight: 600 }}>${parseFloat(line.xmdl004).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
 
-                      {/* 確認出貨按鈕 (核心動作) */}
-                      {sh.xmdkstatus === '0' && (
-                        <button
-                          onClick={() => handleConfirmShipment(sh.xmdkdocno)}
-                          style={{ alignSelf: 'flex-end', background: 'var(--color-primary)', color: '#fff', padding: '8px 16px', fontSize: '13px', borderRadius: '8px', fontWeight: 600 }}
-                        >
-                          確認出貨 (RPC)
-                        </button>
-                      )}
-                    </div>
-                  ))
+                        {/* 按鈕區域 */}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          {/* 確認出貨按鈕 */}
+                          {sh.xmdkstatus === '0' && (
+                            <button
+                              onClick={() => handleConfirmShipment(sh.xmdkdocno)}
+                              style={{ background: 'var(--color-primary)', color: '#fff', padding: '8px 16px', fontSize: '13px', borderRadius: '8px', fontWeight: 600 }}
+                            >
+                              確認出貨 (RPC)
+                            </button>
+                          )}
+                          
+                          {/* 取消出貨按鈕 */}
+                          {sh.xmdkstatus === '1' && (
+                            <button
+                              onClick={() => handleVoidShipment(sh.xmdkdocno)}
+                              style={{ border: '1px solid #ef4444', color: '#ef4444', background: 'transparent', padding: '8px 16px', fontSize: '13px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              取消出貨
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             )}
@@ -437,15 +499,20 @@ export default function Sales({ userDetails }) {
                         <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>暫無帳款記錄</td>
                       </tr>
                     ) : (
-                      receivables.map(rc => (
-                        <tr key={rc.xrcadocno} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '12px 8px', fontWeight: 600 }}>{rc.xrcadocno}</td>
-                          <td style={{ padding: '12px 8px' }}>{rc.xrca002}</td>
-                          <td style={{ padding: '12px 8px' }}>{rc.xrca001}</td>
-                          <td style={{ padding: '12px 8px', color: 'var(--color-primary)', fontWeight: 'bold' }}>${parseFloat(rc.xrca003).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                          <td style={{ padding: '12px 8px' }}>${parseFloat(rc.xrca004 || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                      ))
+                      receivables.map(rc => {
+                        const isVoided = rc.xrcastatus === '9';
+                        return (
+                          <tr key={rc.xrcadocno} style={{ borderBottom: '1px solid var(--border-color)', opacity: isVoided ? 0.5 : 1, textDecoration: isVoided ? 'line-through' : 'none', color: isVoided ? 'var(--text-secondary)' : 'inherit' }}>
+                            <td style={{ padding: '12px 8px', fontWeight: 600 }}>
+                              {rc.xrcadocno} {isVoided && <span style={{ fontSize: '11px', color: '#ef4444', textDecoration: 'none', display: 'inline-block' }}>(已作廢)</span>}
+                            </td>
+                            <td style={{ padding: '12px 8px' }}>{rc.xrca002}</td>
+                            <td style={{ padding: '12px 8px' }}>{rc.xrca001}</td>
+                            <td style={{ padding: '12px 8px', color: isVoided ? 'var(--text-secondary)' : 'var(--color-primary)', fontWeight: 'bold' }}>${parseFloat(rc.xrca003).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '12px 8px' }}>${parseFloat(rc.xrca004 || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

@@ -270,6 +270,40 @@ export default function Purchases({ userDetails }) {
     }
   }
 
+  // --- 核心 RPC: 取消收貨 (作廢) ---
+  async function handleVoidReceipt(docNo) {
+    if (!window.confirm(`確定要取消收貨單 ${docNo} 嗎？此操作將會還原收貨時增加的庫存、作廢對應的應付帳款，且無法復原。`)) return;
+
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const { data, error } = await supabase.rpc('void_goods_receipt', {
+        p_ent: ent,
+        p_docno: docNo,
+        p_user: userDetails.ooagcode
+      });
+
+      if (error) {
+        let friendlyMsg = error.message;
+        if (error.message.includes('STOCK_ALREADY_CONSUMED') || error.message.includes('AP_ALREADY_PAID')) {
+          friendlyMsg = '此單無法直接取消，請聯繫管理員走退貨流程';
+        } else if (error.message.includes('DOC_NOT_CONFIRMED')) {
+          friendlyMsg = '此單尚未確認或已作廢';
+        }
+        setErrorMsg('取消收貨失敗: ' + friendlyMsg);
+      } else {
+        setSuccessMsg(`收貨單 ${docNo} 已成功作廢！`);
+        fetchData();
+      }
+    } catch (err) {
+      setErrorMsg('連線異常: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
@@ -371,41 +405,69 @@ export default function Purchases({ userDetails }) {
             {loading ? <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>載入中...</div> : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {receipts.length === 0 ? <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>暫無收貨記錄</div> : (
-                  receipts.map(gr => (
-                    <div key={gr.pmdsdocno} className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '15px' }}>{gr.pmdsdocno}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                            日期: {gr.pmdsdocdt} | 來源單: {gr.pmds002} | 倉庫: {gr.pmds004}
+                  receipts.map(gr => {
+                    const isVoided = gr.pmdsstatus === '9';
+                    return (
+                      <div 
+                        key={gr.pmdsdocno} 
+                        className="glass-panel" 
+                        style={{ 
+                          padding: '16px', 
+                          border: '1px solid var(--border-color)', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '12px',
+                          opacity: isVoided ? 0.6 : 1,
+                          background: isVoided ? 'rgba(128,128,128,0.05)' : 'var(--bg-panel)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ textDecoration: isVoided ? 'line-through' : 'none' }}>
+                            <div style={{ fontWeight: 600, fontSize: '15px' }}>{gr.pmdsdocno}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                              日期: {gr.pmdsdocdt} | 來源單: {gr.pmds002} | 倉庫: {gr.pmds004}
+                            </div>
                           </div>
+                          <span className={`badge ${isVoided ? 'badge-voided' : gr.pmdsstatus === '1' ? 'badge-confirmed' : 'badge-draft'}`}>
+                            {isVoided ? '已作廢' : gr.pmdsstatus === '1' ? '已入庫' : '未入庫'}
+                          </span>
                         </div>
-                        <span className={`badge ${gr.pmdsstatus === '1' ? 'badge-confirmed' : 'badge-draft'}`}>
-                          {gr.pmdsstatus === '1' ? '已入庫' : '未入庫'}
-                        </span>
-                      </div>
 
-                      {/* 明細 */}
-                      <div style={{ background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '8px', fontSize: '13px' }}>
-                        {gr.lines.map(line => (
-                          <div key={line.pmdtseq} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                            <span>{line.pmdt001} (驗收合格: {line.pmdt003} 片)</span>
-                            <span style={{ fontWeight: 600 }}>${parseFloat(line.pmdt005).toLocaleString()}</span>
-                          </div>
-                        ))}
-                      </div>
+                        {/* 明細 */}
+                        <div style={{ background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '8px', fontSize: '13px', textDecoration: isVoided ? 'line-through' : 'none' }}>
+                          {gr.lines.map(line => (
+                            <div key={line.pmdtseq} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                              <span>{line.pmdt001} (驗收合格: {line.pmdt003} 片)</span>
+                              <span style={{ fontWeight: 600 }}>${parseFloat(line.pmdt005).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
 
-                      {/* 確認收貨按鈕 (核心動作) */}
-                      {gr.pmdsstatus === '0' && (
-                        <button
-                          onClick={() => handleConfirmReceipt(gr.pmdsdocno)}
-                          style={{ alignSelf: 'flex-end', background: 'var(--color-primary)', color: '#fff', padding: '8px 16px', fontSize: '13px', borderRadius: '8px', fontWeight: 600 }}
-                        >
-                          確認收貨 (RPC)
-                        </button>
-                      )}
-                    </div>
-                  ))
+                        {/* 按鈕區域 */}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          {/* 確認收貨按鈕 */}
+                          {gr.pmdsstatus === '0' && (
+                            <button
+                              onClick={() => handleConfirmReceipt(gr.pmdsdocno)}
+                              style={{ background: 'var(--color-primary)', color: '#fff', padding: '8px 16px', fontSize: '13px', borderRadius: '8px', fontWeight: 600 }}
+                            >
+                              確認收貨 (RPC)
+                            </button>
+                          )}
+                          
+                          {/* 取消收貨按鈕 */}
+                          {gr.pmdsstatus === '1' && (
+                            <button
+                              onClick={() => handleVoidReceipt(gr.pmdsdocno)}
+                              style={{ border: '1px solid #ef4444', color: '#ef4444', background: 'transparent', padding: '8px 16px', fontSize: '13px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              取消收貨
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             )}
@@ -434,15 +496,20 @@ export default function Purchases({ userDetails }) {
                         <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>暫無應付記錄</td>
                       </tr>
                     ) : (
-                      payables.map(ap => (
-                        <tr key={ap.apcadocno} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '12px 8px', fontWeight: 600 }}>{ap.apcadocno}</td>
-                          <td style={{ padding: '12px 8px' }}>{ap.apca002}</td>
-                          <td style={{ padding: '12px 8px' }}>{ap.apca001}</td>
-                          <td style={{ padding: '12px 8px', color: '#ef4444', fontWeight: 'bold' }}>${parseFloat(ap.apca003).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                          <td style={{ padding: '12px 8px' }}>${parseFloat(ap.apca004 || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                      ))
+                      payables.map(ap => {
+                        const isVoided = ap.apcastatus === '9';
+                        return (
+                          <tr key={ap.apcadocno} style={{ borderBottom: '1px solid var(--border-color)', opacity: isVoided ? 0.5 : 1, textDecoration: isVoided ? 'line-through' : 'none', color: isVoided ? 'var(--text-secondary)' : 'inherit' }}>
+                            <td style={{ padding: '12px 8px', fontWeight: 600 }}>
+                              {ap.apcadocno} {isVoided && <span style={{ fontSize: '11px', color: '#ef4444', textDecoration: 'none', display: 'inline-block' }}>(已作廢)</span>}
+                            </td>
+                            <td style={{ padding: '12px 8px' }}>{ap.apca002}</td>
+                            <td style={{ padding: '12px 8px' }}>{ap.apca001}</td>
+                            <td style={{ padding: '12px 8px', color: isVoided ? 'var(--text-secondary)' : '#ef4444', fontWeight: 'bold' }}>${parseFloat(ap.apca003).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '12px 8px' }}>${parseFloat(ap.apca004 || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

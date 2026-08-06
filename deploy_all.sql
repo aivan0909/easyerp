@@ -93,7 +93,7 @@ CREATE TABLE xmda_t (
   xmdadocdt  date DEFAULT current_date,
   xmda002    varchar(20),  -- Ê•≠Â?‰∫∫Âì°
   xmda004    varchar(20),  -- ÂÆ¢Êà∂Á∑®Ë?
-  xmdacnfid  varchar(80), xmdacnfdt timestamptz,
+  xmdacnfid  varchar(20), xmdacnfdt timestamptz,
   xmdastatus varchar(10) DEFAULT '0', -- 0?âÁ®ø 1Â∑≤Á¢∫Ë™?  PRIMARY KEY (xmdaent, xmdadocno)
 );
 
@@ -117,7 +117,7 @@ CREATE TABLE xmdk_t (
   xmdk004    varchar(20), -- ÂÆ¢Êà∂Á∑®Ë?
   xmdk005    varchar(20), -- ‰æÜÊ?Ë®ÇÂñÆ?ÆË?
   xmdk006    varchar(10), -- ?∫Ë≤®?âÂ∫´‰ª?¢º
-  xmdkcnfid  varchar(80), xmdkcnfdt timestamptz,
+  xmdkcnfid  varchar(20), xmdkcnfdt timestamptz,
   xmdkstatus varchar(10) DEFAULT '0',
   PRIMARY KEY (xmdkent, xmdkdocno)
 );
@@ -164,7 +164,7 @@ CREATE TABLE pmdl_t (
   pmdlent    integer NOT NULL,
   pmdldocno  varchar(20) NOT NULL,
   pmdldocdt  date DEFAULT current_date,
-  pmdl004    varchar(20),  -- ‰æõÊ??ÜÁ∑®??  pmdlcnfid  varchar(80), pmdlcnfdt timestamptz,
+  pmdl004    varchar(20),  -- ‰æõÊ??ÜÁ∑®??  pmdlcnfid  varchar(20), pmdlcnfdt timestamptz,
   pmdlstatus varchar(10) DEFAULT '0',
   PRIMARY KEY (pmdlent, pmdldocno)
 );
@@ -188,7 +188,7 @@ CREATE TABLE pmds_t (
   pmdsdocdt  date DEFAULT current_date,
   pmds002    varchar(20), -- ‰æÜÊ??°Ë≥º?ÆË?
   pmds003    varchar(20), -- ‰æõÊ??ÜÁ∑®??  pmds004    varchar(10), -- ?∂Ë≤®?âÂ∫´‰ª?¢º
-  pmdscnfid  varchar(80), pmdscnfdt timestamptz,
+  pmdscnfid  varchar(20), pmdscnfdt timestamptz,
   pmdsstatus varchar(10) DEFAULT '0',
   PRIMARY KEY (pmdsent, pmdsdocno)
 );
@@ -390,7 +390,8 @@ $$;
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_stock_out(
   p_ent integer, p_item_code varchar, p_wh_code varchar, p_qty numeric,
-  p_src_doc_type varchar, p_src_doc_no varchar, p_src_doc_seq integer
+  p_src_doc_type varchar, p_src_doc_no varchar, p_src_doc_seq integer,
+  p_category varchar DEFAULT '?∑Ë≤®?∫Ë≤®'
 ) RETURNS void
 LANGUAGE plpgsql
 AS $$
@@ -415,7 +416,7 @@ BEGIN
   v_inagdocno := fn_next_docno('INAG');
 
   INSERT INTO inag_t (inagent, inagdocno, inag001, inag002, inag003, inag004, inag005, inag006, inag007, inag008, inag009)
-  VALUES (p_ent, v_inagdocno, p_item_code, p_wh_code, '?∑Ë≤®?∫Ë≤®', p_src_doc_type, p_src_doc_no, p_src_doc_seq, '-', p_qty, v_new_balance);
+  VALUES (p_ent, v_inagdocno, p_item_code, p_wh_code, p_category, p_src_doc_type, p_src_doc_no, p_src_doc_seq, '-', p_qty, v_new_balance);
 
   UPDATE inaj_t SET inaj003 = v_new_balance
   WHERE inajent = p_ent AND inaj001 = p_item_code AND inaj002 = p_wh_code;
@@ -485,7 +486,8 @@ $$;
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_stock_in(
   p_ent integer, p_item_code varchar, p_wh_code varchar, p_qty numeric,
-  p_src_doc_type varchar, p_src_doc_no varchar, p_src_doc_seq integer
+  p_src_doc_type varchar, p_src_doc_no varchar, p_src_doc_seq integer,
+  p_category varchar DEFAULT '?°Ë≥º?•Â∫´'
 ) RETURNS void
 LANGUAGE plpgsql
 AS $$
@@ -506,7 +508,7 @@ BEGIN
   v_inagdocno := fn_next_docno('INAG');
 
   INSERT INTO inag_t (inagent, inagdocno, inag001, inag002, inag003, inag004, inag005, inag006, inag007, inag008, inag009)
-  VALUES (p_ent, v_inagdocno, p_item_code, p_wh_code, '?°Ë≥º?•Â∫´', p_src_doc_type, p_src_doc_no, p_src_doc_seq, '+', p_qty, v_new_balance);
+  VALUES (p_ent, v_inagdocno, p_item_code, p_wh_code, p_category, p_src_doc_type, p_src_doc_no, p_src_doc_seq, '+', p_qty, v_new_balance);
 
   UPDATE inaj_t SET inaj003 = v_new_balance
   WHERE inajent = p_ent AND inaj001 = p_item_code AND inaj002 = p_wh_code;
@@ -567,6 +569,165 @@ BEGIN
     'docno', p_docno,
     'payableDocNo', v_ap_docno,
     'payableAmount', v_ap_total
+  );
+END;
+$$;
+-- ============================================================
+-- migration_void.sql ??Ë£ú‰??åÂ?Ê∂àÁ¢∫Ë™?‰ΩúÂª¢?çÂ??ΩÊ??ÄÊ¨Ñ‰?
+-- ?®ÁΩ≤?ÜÂ?Ôºöschema.sql -> functions.sql -> migration_void.sql -> void_functions.sql
+-- ============================================================
+
+-- ?∂Ë≤®?ÆÈ†≠ÔºöË?‰ΩúÂª¢??‰ΩúÂª¢?ÇÈ?
+ALTER TABLE pmds_t ADD COLUMN IF NOT EXISTS pmdsvoidid  varchar(80);
+ALTER TABLE pmds_t ADD COLUMN IF NOT EXISTS pmdsvoiddt  timestamptz;
+
+-- ?∫Ë≤®?ÆÈ†≠ÔºöË?‰ΩúÂª¢??‰ΩúÂª¢?ÇÈ?(Â∞çÁ®±)
+ALTER TABLE xmdk_t ADD COLUMN IF NOT EXISTS xmdkvoidid  varchar(80);
+ALTER TABLE xmdk_t ADD COLUMN IF NOT EXISTS xmdkvoiddt  timestamptz;
+
+-- ?â‰?Â∏≥Ê¨æ?ÆÈ†≠ÔºöÂ???demo ?àÁ≤æÁ∞°Ê?‰∫?statusÔºåÈÄôË£°Ë£ú‰?
+ALTER TABLE apca_t ADD COLUMN IF NOT EXISTS apcastatus  varchar(10) DEFAULT '1';
+
+-- ?âÊî∂Â∏≥Ê¨æ?ÆÈ†≠ÔºöÂ?‰∏äÔ?Ë£ú‰? status(Â∞çÁ®±)
+ALTER TABLE xrca_t ADD COLUMN IF NOT EXISTS xrcastatus  varchar(10) DEFAULT '1';
+-- ============================================================
+-- void_functions.sql ???ñÊ?Á¢∫Ë?/‰ΩúÂª¢?üËÉΩ
+-- ?®ÁΩ≤?ÜÂ?Ôºöschema.sql -> functions.sql -> migration_void.sql -> void_functions.sql
+--
+-- Ë®≠Ë??üÂ?Ôº?--   1. ‰∏çÂ?ÂØ¶È??™Èô§Ôºå‰?ÂæãÁî® status='9'(‰ΩúÂª¢) Ê®ôË?Ôºå‰??ôÁ®Ω?∏Ë?Ë∑?--   2. ?©È?ÊÆµÊ™¢?•Ô??àÊ??¥Âºµ?ÆÊ?‰∏ÄË°åÈÉΩÊ™¢Êü•?éÔ??®ÈÉ®?öÈ??çÁ?Ê≠?ü∑Ë°åÈ??üÔ?
+--      ?øÂ??åÊâ£‰∏Ä?äÊ??ºÁèæ‰∏çËÉΩ?ñÊ???--   3. ?§Êñ∑?ØÂê¶?ñÊ??ÑÊ?‰ª∂ÊòØ?åÁèæ?âÂ∫´Â≠????∂Â??∞Â??∏È??çÔ?‰∏çÁâπ?•Â???--      ?†Ê?Â∫´Â?ËÆäÂ??ÑÂ????∫Ë≤®/Ë™øÊï¥/?∂‰?)ÔºåÊ∂µ?ãÁ??çÊõ¥ÂÆåÊï¥‰πüÊõ¥‰∏çÊ??âÊ?Ê¥?--   4. ?•Â??âÁ??âÊî∂/?â‰?Â∏≥Ê¨æÂ∑≤Ê??∂‰?Ê¨æÁ??ÑÔ?‰∏ÄÂæã‰??ÅË®±?ñÊ?Ôº?--      ?Ä?πËµ∞?ÄË≤??òË?Á≠âÊ≠£ÂºèÊ?Á®?-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. ?ñÊ?Á¢∫Ë??∂Ë≤®?ÆÔ?Â∞çÊ?ÔºöÊé°Ë≥?-> ?∂Ë≤® -> ?â‰? ?ôÊ?Á∑öÔ?
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION void_goods_receipt(p_ent integer, p_docno varchar, p_user varchar)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_header  pmds_t%ROWTYPE;
+  v_line    pmdt_t%ROWTYPE;
+  v_ap      apca_t%ROWTYPE;
+  v_current numeric;
+  v_reca    reca_t%ROWTYPE;
+  v_voided_count integer := 0;
+BEGIN
+  SELECT * INTO v_header FROM pmds_t WHERE pmdsent = p_ent AND pmdsdocno = p_docno FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'NOT_FOUND: ?∂Ë≤®?Æ‰?Â≠òÂú® %', p_docno;
+  END IF;
+  IF v_header.pmdsstatus <> '1' THEN
+    RAISE EXCEPTION 'DOC_NOT_CONFIRMED: ?™Ê?Â∑≤Á¢∫Ë™çÁ??∂Ë≤®?ÆÊ??ΩÂ?Ê∂??ÆÂ??Ä??%)', v_header.pmdsstatus;
+  END IF;
+
+  -- Ê™¢Êü•Â∞çÊ??â‰?Â∏≥Ê¨æ?ÆÊòØ?¶Â∑≤?â‰?Ê¨?  SELECT * INTO v_ap FROM apca_t WHERE apcaent = p_ent AND apca002 = p_docno FOR UPDATE;
+  IF FOUND AND v_ap.apca004 > 0.0001 THEN
+    RAISE EXCEPTION 'AP_ALREADY_PAID: Â∞çÊ??â‰?Â∏≥Ê¨æ??%)Â∑≤Ê?‰ªòÊ¨æÁ¥Ä??Â∑≤‰? %)ÔºåÁÑ°Ê≥ïÂ?Ê∂àÊî∂Ë≤®Ô?Ë´ãÊîπ?®ÈÄÄË≤®Ê?Á®?, v_ap.apcadocno, v_ap.apca004;
+  END IF;
+
+  -- Á¨¨‰?Ëº™Ô??êË?Ê™¢Êü•Â∫´Â??ØÂê¶Ë∂≥Â????(Ê≠§ÊâπË≤®Â??®Ê?Ë¢´Â??®È?)
+  FOR v_line IN SELECT * FROM pmdt_t WHERE pmdtent = p_ent AND pmdtdocno = p_docno ORDER BY pmdtseq
+  LOOP
+    SELECT inaj003 INTO v_current FROM inaj_t
+    WHERE inajent = p_ent AND inaj001 = v_line.pmdt001 AND inaj002 = v_header.pmds004
+    FOR UPDATE;
+
+    IF v_current IS NULL OR v_current < v_line.pmdt003 - 0.0001 THEN
+      RAISE EXCEPTION 'STOCK_ALREADY_CONSUMED: ?ÜÂ? % ?ÆÂ?Â∫´Â?(%)‰∏çË∂≥‰ª•Êâ£?ûÁï∂?ùÊî∂Ë≤®Êï∏??%)ÔºåÊ≠§?πË≤®Â∑≤Ë¢´?ïÁî®ÔºåÁÑ°Ê≥ïÁõ¥?•Â?Ê∂àÔ?Ë´ãÊîπ?®ÈÄÄË≤®Ê?Á®?,
+        v_line.pmdt001, coalesce(v_current, 0), v_line.pmdt003;
+    END IF;
+  END LOOP;
+
+  -- Á¨¨‰?Ëº™Ô??®ÈÉ®?öÈ?Ê™¢Êü•ÔºåÊ??üÊ≠£?∑Ë??ÑÂ?
+  FOR v_line IN SELECT * FROM pmdt_t WHERE pmdtent = p_ent AND pmdtdocno = p_docno ORDER BY pmdtseq
+  LOOP
+    -- ?çÂ?Â∫´Â??∞Â?(???)
+    PERFORM fn_stock_out(p_ent, v_line.pmdt001, v_header.pmds004, v_line.pmdt003, 'GR_VOID', p_docno, v_line.pmdtseq);
+
+    -- ?æÂà∞Â∞çÊ??∏Èä∑Á¥Ä?ÑÔ?Ê®ôË?‰ΩúÂª¢Ôºå‰∏¶?ûÊ??°Ë≥º?ÆÂ∑≤?•Â∫´?∏È?
+    SELECT * INTO v_reca FROM reca_t
+    WHERE recaent = p_ent AND reca004 = 'GR' AND reca005 = p_docno AND reca006 = v_line.pmdtseq;
+
+    IF FOUND THEN
+      UPDATE reca_t SET reca012 = '9' WHERE recaent = p_ent AND recadocno = v_reca.recadocno;
+      UPDATE pmdn_t SET pmdn005 = pmdn005 - v_reca.reca008
+      WHERE pmdnent = p_ent AND pmdndocno = v_reca.reca002 AND pmdnseq = v_reca.reca003;
+      v_voided_count := v_voided_count + 1;
+    END IF;
+  END LOOP;
+
+  -- ‰ΩúÂª¢?∂Ë≤®??  UPDATE pmds_t SET pmdsstatus = '9', pmdsvoidid = p_user, pmdsvoiddt = now()
+  WHERE pmdsent = p_ent AND pmdsdocno = p_docno;
+
+  -- ‰∏Ä‰Ωµ‰?Âª¢Â??âÊ?‰ªòÂ∏≥Ê¨æÂñÆ(?çÈù¢Â∑≤Á¢∫Ë™çÊú™‰ªòÊ¨æÔºåÂèØÂÆâÂÖ®‰ΩúÂª¢)
+  IF v_ap.apcadocno IS NOT NULL THEN
+    UPDATE apca_t SET apcastatus = '9' WHERE apcaent = p_ent AND apcadocno = v_ap.apcadocno;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'docno', p_docno, 'status', 'voided',
+    'reconciliationVoided', v_voided_count,
+    'payableVoided', v_ap.apcadocno
+  );
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- 2. ?ñÊ?Á¢∫Ë??∫Ë≤®?ÆÔ?Â∞çÁ®±ÔºöÈä∑Ë≤?-> ?∫Ë≤® -> ?âÊî∂ ?ôÊ?Á∑öÔ?
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION void_shipment(p_ent integer, p_docno varchar, p_user varchar)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_header  xmdk_t%ROWTYPE;
+  v_line    xmdl_t%ROWTYPE;
+  v_ar      xrca_t%ROWTYPE;
+  v_reca    reca_t%ROWTYPE;
+  v_voided_count integer := 0;
+BEGIN
+  SELECT * INTO v_header FROM xmdk_t WHERE xmdkent = p_ent AND xmdkdocno = p_docno FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'NOT_FOUND: ?∫Ë≤®?Æ‰?Â≠òÂú® %', p_docno;
+  END IF;
+  IF v_header.xmdkstatus <> '1' THEN
+    RAISE EXCEPTION 'DOC_NOT_CONFIRMED: ?™Ê?Â∑≤Á¢∫Ë™çÁ??∫Ë≤®?ÆÊ??ΩÂ?Ê∂??ÆÂ??Ä??%)', v_header.xmdkstatus;
+  END IF;
+
+  -- ?∫Ë≤®?ÑÈ??üÊòØ?åÂ??ûÂ∫´Â≠ò„ÄçÔ?‰∏çÈ?Ë¶ÅÊ™¢?•Â∫´Â≠òÊòØ?¶Ë∂≥Â§??ôÈ?Ë∑üÊî∂Ë≤®Â?Ê∂à‰??åÔ?
+  -- ?†Â∫´Â≠òÊ∞∏?†ÂèØ‰ª•Âü∑Ë°?Ôºå‰?Ë¶ÅÊ™¢?•Â??âÊ??∂Â∏≥Ê¨æÊòØ?¶Â∑≤?∂Ê¨æ
+  SELECT * INTO v_ar FROM xrca_t WHERE xrcaent = p_ent AND xrca002 = p_docno FOR UPDATE;
+  IF FOUND AND v_ar.xrca004 > 0.0001 THEN
+    RAISE EXCEPTION 'AR_ALREADY_PAID: Â∞çÊ??âÊî∂Â∏≥Ê¨æ??%)Â∑≤Ê??∂Ê¨æÁ¥Ä??Â∑≤Êî∂ %)ÔºåÁÑ°Ê≥ïÂ?Ê∂àÂá∫Ë≤®Ô?Ë´ãÊîπ?®ÈÄÄË≤®Ê?Á®?, v_ar.xrcadocno, v_ar.xrca004;
+  END IF;
+
+  FOR v_line IN SELECT * FROM xmdl_t WHERE xmdlent = p_ent AND xmdldocno = p_docno ORDER BY xmdlseq
+  LOOP
+    -- ?çÂ?Â∫´Â??∞Â?(?†Â?)
+    PERFORM fn_stock_in(p_ent, v_line.xmdl001, v_header.xmdk006, v_line.xmdl002, 'SH_VOID', p_docno, v_line.xmdlseq);
+
+    -- ?æÂà∞Â∞çÊ??∏Èä∑Á¥Ä?ÑÔ?Ê®ôË?‰ΩúÂª¢Ôºå‰∏¶?ûÊ?Ë®ÇÂñÆÂ∑≤Âá∫Ë≤®Êï∏??    SELECT * INTO v_reca FROM reca_t
+    WHERE recaent = p_ent AND reca004 = 'SH' AND reca005 = p_docno AND reca006 = v_line.xmdlseq;
+
+    IF FOUND THEN
+      UPDATE reca_t SET reca012 = '9' WHERE recaent = p_ent AND recadocno = v_reca.recadocno;
+      UPDATE xmdc_t SET xmdc005 = xmdc005 - v_reca.reca008
+      WHERE xmdcent = p_ent AND xmdcdocno = v_reca.reca002 AND xmdcseq = v_reca.reca003;
+      v_voided_count := v_voided_count + 1;
+    END IF;
+  END LOOP;
+
+  UPDATE xmdk_t SET xmdkstatus = '9', xmdkvoidid = p_user, xmdkvoiddt = now()
+  WHERE xmdkent = p_ent AND xmdkdocno = p_docno;
+
+  IF v_ar.xrcadocno IS NOT NULL THEN
+    UPDATE xrca_t SET xrcastatus = '9' WHERE xrcaent = p_ent AND xrcadocno = v_ar.xrcadocno;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'docno', p_docno, 'status', 'voided',
+    'reconciliationVoided', v_voided_count,
+    'receivableVoided', v_ar.xrcadocno
   );
 END;
 $$;
