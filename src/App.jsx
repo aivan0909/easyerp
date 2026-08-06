@@ -54,13 +54,10 @@ export default function App() {
     document.body.classList.add(`theme-${theme}`);
   }, [theme]);
 
-  // 載入與初始化資料庫使用者檔案 (ooag_t / rola_t / rolb_t)
+  // 載入與初始化資料庫使用者檔案 (ooag_t)
   async function loadUserDetails(user) {
     try {
-      // 1. 初始化基礎角色 (rola_t & rolb_t) 以防止新專案空無資料
-      await initializeRolesAndPermissions();
-
-      // 2. 查詢 ooag_t 是否已有該使用者
+      // 1. 查詢 ooag_t 是否已有該使用者
       const { data, error } = await supabase
         .from('ooag_t')
         .select('*')
@@ -68,17 +65,17 @@ export default function App() {
         .single();
 
       if (error && error.code === 'PGRST116') {
-        // PGRST116 代表沒有資料，自動為其新增
+        // PGRST116 代表沒有資料，自動為其新增基本檔案
         console.log('在 ooag_t 中未找到使用者檔案，正在為其建立...');
         
         const defaultName = user.email.split('@')[0];
         
-        // 預設建立為 ADMIN (管理員)，方便使用者測試所有功能
+        // 預設建立為 STAFF (一般職員)，管理員帳號已在 seed.sql 中建立
         const newUserProfile = {
           ooagent: 1,
           ooagcode: user.id,
           ooag001: defaultName,
-          ooag003: 'ADMIN',
+          ooag003: 'STAFF',
           ooag004: 'obsidian',
           ooagstatus: '1'
         };
@@ -86,10 +83,10 @@ export default function App() {
         const { error: insErr } = await supabase.from('ooag_t').insert(newUserProfile);
         if (insErr) throw insErr;
 
-        setUserDetails({ ...newUserProfile, isAdmin: true });
+        setUserDetails({ ...newUserProfile, isAdmin: false });
         setTheme('obsidian');
       } else if (data) {
-        // 3. 取得使用者的管理員屬性
+        // 2. 取得使用者的管理員屬性 (對應 rola_t)
         const { data: roleData } = await supabase
           .from('rola_t')
           .select('rola002')
@@ -113,32 +110,6 @@ export default function App() {
       console.error('載入使用者偏好失敗:', err.message);
     } finally {
       setLoading(false);
-    }
-  }
-
-  // 自動初始化角色主檔與權限
-  async function initializeRolesAndPermissions() {
-    try {
-      // 檢查 rola_t 是否有資料
-      const { data: roles } = await supabase.from('rola_t').select('rolacode').limit(1);
-      if (!roles || roles.length === 0) {
-        console.log('資料庫中角色主檔為空，正在建立預設角色...');
-        // 寫入 ADMIN 與 STAFF 角色
-        await supabase.from('rola_t').insert([
-          { rolaent: 1, rolacode: 'ADMIN', rola001: '系統管理員', rola002: '1', rolastatus: '1' },
-          { rolaent: 1, rolacode: 'STAFF', rola001: '一般職員', rola002: '0', rolastatus: '1' }
-        ]);
-
-        // 寫入一般職員的細部權限
-        await supabase.from('rolb_t').insert([
-          { rolbent: 1, rolbcode: 'STAFF', rolbseq: 1, rolb001: '銷貨訂單', rolb002: '1', rolb003: '1', rolb004: '0', rolb005: '0' },
-          { rolbent: 1, rolbcode: 'STAFF', rolbseq: 2, rolb001: '出貨單', rolb002: '1', rolb003: '1', rolb004: '0', rolb005: '0' },
-          { rolbent: 1, rolbcode: 'STAFF', rolbseq: 3, rolb001: '採購單', rolb002: '1', rolb003: '1', rolb004: '0', rolb005: '0' },
-          { rolbent: 1, rolbcode: 'STAFF', rolbseq: 4, rolb001: '庫存查詢', rolb002: '1', rolb003: '0', rolb004: '0', rolb005: '0' }
-        ]);
-      }
-    } catch (e) {
-      console.warn('初始化基礎權限角色失敗(可能權限受限，可忽略):', e.message);
     }
   }
 

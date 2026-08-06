@@ -1,5 +1,5 @@
 -- ============================================================
--- ERP 系統 — Row Level Security (RLS) 政策
+-- ERP 系統 — Row Level Security (RLS) 政策 (修正版)
 -- ============================================================
 
 -- ========== 1. RLS Helper 函數 ==========
@@ -30,124 +30,72 @@ AS $$
   LIMIT 1;
 $$;
 
--- ========== 2. 針對各表啟用 RLS 與套用政策 ==========
 
--- 主檔與基本資料
-ALTER TABLE imaa_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY imaa_policy ON imaa_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR imaaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR imaaent = get_auth_user_ent());
+-- ========== 2. 成員基本資料與權限表 (啟用 RLS) ==========
 
-ALTER TABLE cusa_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY cusa_policy ON cusa_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR cusaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR cusaent = get_auth_user_ent());
-
-ALTER TABLE vnda_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY vnda_policy ON vnda_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR vndaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR vndaent = get_auth_user_ent());
-
-ALTER TABLE inaa_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY inaa_policy ON inaa_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR inaaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR inaaent = get_auth_user_ent());
-
+-- [ooag_t] 使用者檔案表
 ALTER TABLE ooag_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY ooag_policy ON ooag_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR ooagent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR ooagent = get_auth_user_ent());
 
+-- 允許 authenticated 使用者新增自己的檔案，限制 ooagcode 必須等於 auth.uid()
+DROP POLICY IF EXISTS ooag_insert_policy ON ooag_t;
+CREATE POLICY ooag_insert_policy ON ooag_t FOR INSERT TO authenticated
+  WITH CHECK (ooagcode = auth.uid()::text);
+
+-- 允許 authenticated 使用者查詢自己的檔案
+DROP POLICY IF EXISTS ooag_select_policy ON ooag_t;
+CREATE POLICY ooag_select_policy ON ooag_t FOR SELECT TO authenticated
+  USING (ooagcode = auth.uid()::text);
+
+-- 允許 authenticated 使用者更新自己的檔案 (例如介面主題)
+DROP POLICY IF EXISTS ooag_update_policy ON ooag_t;
+CREATE POLICY ooag_update_policy ON ooag_t FOR UPDATE TO authenticated
+  USING (ooagcode = auth.uid()::text)
+  WITH CHECK (ooagcode = auth.uid()::text);
+
+
+-- [rola_t] 角色表 (只允許讀取，不允許寫入)
 ALTER TABLE rola_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rola_policy ON rola_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR rolaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR rolaent = get_auth_user_ent());
 
+DROP POLICY IF EXISTS rola_select_policy ON rola_t;
+CREATE POLICY rola_select_policy ON rola_t FOR SELECT TO authenticated
+  USING (true);
+
+
+-- [rolb_t] 角色模組權限明細表 (只允許讀取，不允許寫入)
 ALTER TABLE rolb_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rolb_policy ON rolb_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR rolbent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR rolbent = get_auth_user_ent());
 
--- 銷貨模組
-ALTER TABLE xmda_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY xmda_policy ON xmda_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR xmdaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR xmdaent = get_auth_user_ent());
+DROP POLICY IF EXISTS rolb_select_policy ON rolb_t;
+CREATE POLICY rolb_select_policy ON rolb_t FOR SELECT TO authenticated
+  USING (true);
 
-ALTER TABLE xmdc_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY xmdc_policy ON xmdc_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR xmdcent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR xmdcent = get_auth_user_ent());
 
-ALTER TABLE xmdk_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY xmdk_policy ON xmdk_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR xmdkent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR xmdkent = get_auth_user_ent());
-
-ALTER TABLE xmdl_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY xmdl_policy ON xmdl_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR xmdlent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR xmdlent = get_auth_user_ent());
-
-ALTER TABLE xrca_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY xrca_policy ON xrca_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR xrcaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR xrcaent = get_auth_user_ent());
-
-ALTER TABLE xrcb_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY xrcb_policy ON xrcb_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR xrcbent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR xrcbent = get_auth_user_ent());
-
--- 採購模組
-ALTER TABLE pmdl_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY pmdl_policy ON pmdl_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR pmdlent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR pmdlent = get_auth_user_ent());
-
-ALTER TABLE pmdn_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY pmdn_policy ON pmdn_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR pmdnent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR pmdnent = get_auth_user_ent());
-
-ALTER TABLE pmds_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY pmds_policy ON pmds_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR pmdsent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR pmdsent = get_auth_user_ent());
-
-ALTER TABLE pmdt_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY pmdt_policy ON pmdt_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR pmdtent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR pmdtent = get_auth_user_ent());
-
-ALTER TABLE apca_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY apca_policy ON apca_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR apcaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR apcaent = get_auth_user_ent());
-
-ALTER TABLE apcb_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY apcb_policy ON apcb_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR apcbent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR apcbent = get_auth_user_ent());
-
--- 庫存與核銷
-ALTER TABLE inag_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY inag_policy ON inag_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR inagent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR inagent = get_auth_user_ent());
-
-ALTER TABLE inaj_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY inaj_policy ON inaj_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR inajent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR inajent = get_auth_user_ent());
-
-ALTER TABLE reca_t ENABLE ROW LEVEL SECURITY;
-CREATE POLICY reca_policy ON reca_t FOR ALL TO authenticated
-  USING (is_auth_user_admin() OR recaent = get_auth_user_ent())
-  WITH CHECK (is_auth_user_admin() OR recaent = get_auth_user_ent());
-
--- 單號序號表 (沒有企業欄位，允許所有登入用戶讀取與修改)
+-- [doc_seq_t] 單號序號表 (允許讀取與更新以讓 fn_next_docno 運作)
 ALTER TABLE doc_seq_t ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS doc_seq_policy ON doc_seq_t;
 CREATE POLICY doc_seq_policy ON doc_seq_t FOR ALL TO authenticated
   USING (true)
   WITH CHECK (true);
+
+
+-- ========== 3. 其他業務表 (暫時停用 RLS，待確認方案後套用) ==========
+
+ALTER TABLE imaa_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cusa_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE vnda_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inaa_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE xmda_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE xmdc_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE xmdk_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE xmdl_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE xrca_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE xrcb_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE pmdl_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE pmdn_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE pmds_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE pmdt_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE apca_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE apcb_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inag_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inaj_t DISABLE ROW LEVEL SECURITY;
+ALTER TABLE reca_t DISABLE ROW LEVEL SECURITY;
