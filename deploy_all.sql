@@ -1077,6 +1077,41 @@ CREATE TRIGGER on_auth_user_login
   AFTER UPDATE OF last_sign_in_at ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_auth_user_login();
 -- ============================================================
+-- migration_rls_helpers.sql ??ç®¡ç??¡æ??åˆ¤?·è??©å‡½å¼?+ å¸³è?ç®¡ç??¸é? RLS
+-- ?¨ç½²?†å?ï¼?.. -> migration_user_email.sql -> migration_rls_helpers.sql
+-- ============================================================
+
+-- ?¤æ–·?®å??»å…¥?…æ˜¯?¦ç‚ºç®¡ç???ä¾?ooag_t.ooag003 å°æ? rola_t.rola002)
+-- ?™æ”¯?½å??ƒè¢«å¤šå€?RLS ?¿ç??è?ä½¿ç”¨ï¼Œçµ±ä¸€å¯«ä?æ¬¡ï?ä¹‹å??¶ä?è¡¨è??‹æ”¾
+-- ?Œç®¡?†å“¡?¯ä»¥???¹å…¨?¨è??™ã€æ?ï¼Œéƒ½?¯ä»¥?´æ¥?¼å«?™æ”¯?½å?ï¼Œä??¨é?è¤‡å¯«?¤æ–·?è¼¯
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM ooag_t o
+    JOIN rola_t r ON r.rolaent = o.ooagent AND r.rolacode = o.ooag003
+    WHERE o.ooagent = 1 AND o.ooagcode = auth.uid()::text AND r.rola002 = '1'
+  );
+$$;
+
+-- ?è¨±ç®¡ç??¡æ›´?°ä»»ä½•äºº??ooag_t è³‡æ?(?ºæœ¬è³‡æ?ç·¨è¼¯?¨é€?
+-- æ³¨æ?ï¼šä??¬ä½¿?¨è€…å??¬å°±?‰ã€Œåª?½æ”¹?ªå·±????ç??¿ç?(?ˆå?å·²è¨­å®?ï¼?-- ?™è£¡?¯ã€Œæ–°å¢ã€ä?æ¢çµ¦ç®¡ç??¡ç?ä¾‹å?è¦å?ï¼Œå…©æ¢æ”¿ç­–ä¸¦å­˜ï?ç¬¦å??¶ä??³å¯?šé?
+DROP POLICY IF EXISTS ooag_admin_update ON ooag_t;
+CREATE POLICY ooag_admin_update ON ooag_t
+  FOR UPDATE
+  USING (is_admin())
+  WITH CHECK (is_admin());
+
+-- ?è¨±ç®¡ç??¡æŸ¥è©¢æ??‰ä½¿?¨è€??Ÿæœ¬?„æ”¿ç­–å¯?½åª?‹æ”¾?‹è‡ªå·??™è£¡? é?ç®¡ç??¡ä?å¤?
+DROP POLICY IF EXISTS ooag_admin_select ON ooag_t;
+CREATE POLICY ooag_admin_select ON ooag_t
+  FOR SELECT
+  USING (is_admin());
+-- ============================================================
 -- ERP ç³»çµ± ??Row Level Security (RLS) ?¿ç?
 -- ============================================================
 

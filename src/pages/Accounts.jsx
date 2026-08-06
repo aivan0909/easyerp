@@ -21,6 +21,14 @@ export default function Accounts({ userDetails }) {
     enterprise: userDetails.ooagent
   });
 
+  // 編輯與重設密碼表單
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editAccount, setEditAccount] = useState({ code: '', name: '', role: 'STAFF' });
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetMode, setResetMode] = useState('email'); // email, direct
+  const [resetPasswordVal, setResetPasswordVal] = useState('');
+  const [resetTargetUser, setResetTargetUser] = useState(null); // { code, name }
+
   const ent = userDetails.ooagent;
   const isAdmin = userDetails.isAdmin;
 
@@ -103,6 +111,67 @@ export default function Accounts({ userDetails }) {
     }
   }
 
+  async function handleUpdateAccount(e) {
+    e.preventDefault();
+    if (!editAccount.name) return alert('請填寫姓名');
+
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const { error } = await supabase
+        .from('ooag_t')
+        .update({
+          ooag001: editAccount.name.trim(),
+          ooag003: editAccount.role
+        })
+        .eq('ooagcode', editAccount.code);
+
+      if (error) throw error;
+
+      setSuccessMsg(`更新成員 ${editAccount.name} 成功！`);
+      setShowEditModal(false);
+      fetchData();
+    } catch (err) {
+      setErrorMsg('更新成員失敗: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResetPassword(e) {
+    e.preventDefault();
+    if (resetMode === 'direct' && (!resetPasswordVal || resetPasswordVal.length < 8)) {
+      return alert('請填寫至少 8 碼的新密碼');
+    }
+
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: {
+          userId: resetTargetUser.code,
+          mode: resetMode,
+          newPassword: resetMode === 'direct' ? resetPasswordVal.trim() : undefined
+        }
+      });
+
+      if (error) throw error;
+      if (data && data.error) throw new Error(data.error);
+
+      setSuccessMsg(`重設使用者 ${resetTargetUser.name} 密碼成功！(${resetMode === 'email' ? '已寄送重設信' : '已直接變更為臨時密碼'})`);
+      setShowResetModal(false);
+      setResetPasswordVal('');
+    } catch (err) {
+      setErrorMsg('重設密碼失敗: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (!isAdmin) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>
@@ -171,12 +240,13 @@ export default function Accounts({ userDetails }) {
                       <th style={{ padding: '12px 8px' }}>角色代碼</th>
                       <th style={{ padding: '12px 8px' }}>主題偏好</th>
                       <th style={{ padding: '12px 8px' }}>權限類型</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'right' }}>操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {usersList.length === 0 ? (
                       <tr>
-                        <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>暫無成員帳號</td>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>暫無成員帳號</td>
                       </tr>
                     ) : (
                       usersList.map(u => (
@@ -201,6 +271,35 @@ export default function Accounts({ userDetails }) {
                             ) : (
                               <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>一般成員</span>
                             )}
+                          </td>
+                          <td style={{ padding: '12px 8px', display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <button
+                              onClick={() => {
+                                setEditAccount({
+                                  code: u.ooagcode,
+                                  name: u.ooag001 || '',
+                                  role: u.ooag003 || 'STAFF'
+                                });
+                                setShowEditModal(true);
+                              }}
+                              style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid var(--color-primary)', color: 'var(--color-primary)', background: 'transparent', cursor: 'pointer' }}
+                            >
+                              編輯
+                            </button>
+                            <button
+                              onClick={() => {
+                                setResetTargetUser({
+                                  code: u.ooagcode,
+                                  name: u.ooag001 || u.ooag006 || '未命名'
+                                });
+                                setResetMode('email');
+                                setResetPasswordVal('');
+                                setShowResetModal(true);
+                              }}
+                              style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid #d97706', color: '#d97706', background: 'transparent', cursor: 'pointer' }}
+                            >
+                              重設密碼
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -339,6 +438,100 @@ export default function Accounts({ userDetails }) {
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)} style={{ padding: '8px 16px' }}>取消</button>
                 <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>確認建立</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal - 編輯成員 */}
+      {showEditModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
+          <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 600 }}>編輯成員基本資料</h3>
+
+            <form onSubmit={handleUpdateAccount} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>姓名</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="輸入成員姓名"
+                  value={editAccount.name}
+                  onChange={(e) => setEditAccount({ ...editAccount, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>角色分配</label>
+                <select
+                  value={editAccount.role}
+                  onChange={(e) => setEditAccount({ ...editAccount, role: e.target.value })}
+                >
+                  <option value="ADMIN">系統管理員 (ADMIN)</option>
+                  <option value="STAFF">一般職員 (STAFF)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowEditModal(false)} style={{ padding: '8px 16px' }}>取消</button>
+                <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>確認儲存</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal - 重設密碼 */}
+      {showResetModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
+          <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 600 }}>重設密碼 ({resetTargetUser?.name})</h3>
+
+            <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>重設模式</label>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '14px' }}>
+                    <input 
+                      type="radio" 
+                      name="resetMode" 
+                      value="email" 
+                      checked={resetMode === 'email'} 
+                      onChange={() => setResetMode('email')} 
+                    />
+                    寄送重設密碼信
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '14px' }}>
+                    <input 
+                      type="radio" 
+                      name="resetMode" 
+                      value="direct" 
+                      checked={resetMode === 'direct'} 
+                      onChange={() => setResetMode('direct')} 
+                    />
+                    直接設定臨時密碼
+                  </label>
+                </div>
+              </div>
+
+              {resetMode === 'direct' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>新密碼 (至少8碼)</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    placeholder="輸入新密碼"
+                    value={resetPasswordVal}
+                    onChange={(e) => setResetPasswordVal(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowResetModal(false)} style={{ padding: '8px 16px' }}>取消</button>
+                <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>確認重設</button>
               </div>
             </form>
           </div>
