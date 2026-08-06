@@ -21,7 +21,7 @@ export default function Purchases({ userDetails }) {
   const [newOrder, setNewOrder] = useState({ vendor: '', items: [{ code: '', qty: 1, price: 0 }] });
 
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [newReceipt, setNewReceipt] = useState({ vendor: '', sourceOrder: '', warehouse: '', items: [] });
+  const [newReceipt, setNewReceipt] = useState({ vendor: '', sourceOrder: '', warehouse: '', items: [], extraCost: 0 });
 
   const ent = userDetails.ooagent;
   const isAdmin = userDetails.isAdmin;
@@ -208,7 +208,8 @@ export default function Purchases({ userDetails }) {
         pmds002: newReceipt.sourceOrder,
         pmds003: newReceipt.vendor,
         pmds004: newReceipt.warehouse,
-        pmdsstatus: '0'
+        pmdsstatus: '0',
+        pmds006: parseFloat(newReceipt.extraCost || 0)
       });
       if (headErr) throw headErr;
 
@@ -230,7 +231,7 @@ export default function Purchases({ userDetails }) {
 
       setSuccessMsg(`收貨單 ${docNo} 建立成功！`);
       setShowReceiptModal(false);
-      setNewReceipt({ vendor: '', sourceOrder: '', warehouse: '', items: [] });
+      setNewReceipt({ vendor: '', sourceOrder: '', warehouse: '', items: [], extraCost: 0 });
       fetchData();
     } catch (err) {
       setErrorMsg('建立收貨單失敗: ' + err.message);
@@ -482,9 +483,15 @@ export default function Purchases({ userDetails }) {
                         {/* 明細 */}
                         <div style={{ background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '8px', fontSize: '13px', textDecoration: isVoided ? 'line-through' : 'none' }}>
                           {gr.lines.map(line => (
-                            <div key={line.pmdtseq} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                              <span>{line.pmdt001} (驗收合格: {line.pmdt003} 片)</span>
-                              <span style={{ fontWeight: 600 }}>${parseFloat(line.pmdt005).toLocaleString()}</span>
+                            <div key={line.pmdtseq} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ fontWeight: 500 }}>{line.pmdt001} (驗收合格: {line.pmdt003} 片)</span>
+                                <span style={{ fontWeight: 600 }}>${parseFloat(line.pmdt005).toLocaleString()}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                <span>分攤費用: ${parseFloat(line.pmdt007 || 0).toFixed(2)}</span>
+                                <span>落地單位成本: ${parseFloat(line.pmdt008 || 0).toFixed(4)}</span>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -631,9 +638,21 @@ export default function Purchases({ userDetails }) {
               <div>
                 <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>收貨入庫倉庫</label>
                 <select required value={newReceipt.warehouse} onChange={(e) => setNewReceipt({ ...newReceipt, warehouse: e.target.value })}>
-                  <option value="">-- 請選擇倉庫 --</option>
-                  {warehouses.map(w => <option key={w.inaacode} value={w.inaacode}>{w.inaa001} ({w.inaacode})</option>)}
+                   <option value="">-- 請選擇倉庫 --</option>
+                   {warehouses.map(w => <option key={w.inaacode} value={w.inaacode}>{w.inaa001} ({w.inaacode})</option>)}
                 </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>額外費用 (運費/關稅)</label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  step="0.01"
+                  placeholder="預設 0" 
+                  value={newReceipt.extraCost || ''} 
+                  onChange={(e) => setNewReceipt({ ...newReceipt, extraCost: parseFloat(e.target.value) || 0 })} 
+                />
               </div>
 
               {newReceipt.items.length > 0 && (

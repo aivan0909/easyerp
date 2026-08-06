@@ -6,7 +6,8 @@ import Purchases from './pages/Purchases';
 import Stock from './pages/Stock';
 import Accounts from './pages/Accounts';
 import MasterData from './pages/MasterData';
-import { LayoutDashboard, ShoppingBag, Truck, Package, Users, Settings, LogOut, Palette, Menu, X, Database } from 'lucide-react';
+import ProfitReport from './pages/ProfitReport';
+import { LayoutDashboard, ShoppingBag, Truck, Package, Users, Settings, LogOut, Palette, Menu, X, Database, TrendingUp } from 'lucide-react';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -340,6 +341,13 @@ export default function App() {
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'inline-block' }}>
               Hi, <strong style={{ color: 'var(--text-primary)' }}>{userDetails?.ooag001}</strong>
             </span>
+            <button 
+              onClick={() => setActiveTab('profit')} 
+              style={{ background: 'transparent', color: activeTab === 'profit' ? 'var(--color-primary)' : 'var(--text-secondary)', padding: '6px' }} 
+              title="毛利報表"
+            >
+              <TrendingUp size={18} />
+            </button>
             {userDetails?.isAdmin && (
               <button 
                 onClick={() => setActiveTab('accounts')} 
@@ -399,6 +407,14 @@ export default function App() {
             <Database size={18} /> <span style={{ fontWeight: activeTab === 'masterdata' ? 600 : 400 }}>基本資料</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('profit')}
+            className={`nav-item ${activeTab === 'profit' ? 'active' : ''}`}
+            style={{ width: '100%', display: 'flex', flexDirection: 'row', gap: '12px', alignItems: 'center', padding: '12px', borderRadius: '8px', fontSize: '14px', background: activeTab === 'profit' ? 'var(--bg-tertiary)' : 'transparent' }}
+          >
+            <TrendingUp size={18} /> <span style={{ fontWeight: activeTab === 'profit' ? 600 : 400 }}>毛利分析報表</span>
+          </button>
+
           {userDetails?.isAdmin && (
             <button
               onClick={() => setActiveTab('accounts')}
@@ -417,6 +433,7 @@ export default function App() {
           {activeTab === 'purchases' && <Purchases userDetails={userDetails} />}
           {activeTab === 'stock' && <Stock userDetails={userDetails} />}
           {activeTab === 'masterdata' && <MasterData userDetails={userDetails} />}
+          {activeTab === 'profit' && <ProfitReport userDetails={userDetails} />}
           {activeTab === 'accounts' && <Accounts userDetails={userDetails} />}
         </main>
       </div>

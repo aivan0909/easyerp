@@ -7,7 +7,8 @@ export default function Dashboard({ userDetails }) {
     receivables: 0,
     payables: 0,
     totalStock: 0,
-    warnings: 0
+    warnings: 0,
+    monthlyProfit: 0
   });
   const [recentSales, setRecentSales] = useState([]);
   const [recentPurchases, setRecentPurchases] = useState([]);
@@ -57,11 +58,26 @@ export default function Dashboard({ userDetails }) {
         });
       }
 
+      // 3.5 計算本月毛利
+      const today = new Date();
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+      const lastDayOfMonth = today.toISOString().slice(0, 10);
+
+      let profitQuery = supabase
+        .from('profit_report_v')
+        .select('gross_profit')
+        .gte('ship_date', firstDayOfMonth)
+        .lte('ship_date', lastDayOfMonth);
+      if (!isAdmin) profitQuery = profitQuery.eq('ent', ent);
+      const { data: profitData } = await profitQuery;
+      const monthlyProfitTotal = (profitData || []).reduce((sum, item) => sum + parseFloat(item.gross_profit || 0), 0);
+
       setMetrics({
         receivables: receivablesTotal,
         payables: payablesTotal,
         totalStock: stockTotal,
-        warnings: warnCount
+        warnings: warnCount,
+        monthlyProfit: monthlyProfitTotal
       });
 
       // 4. 取得最近 5 筆銷貨訂單 (使用 View 自動排除作廢)
@@ -140,6 +156,17 @@ export default function Dashboard({ userDetails }) {
           <div>
             <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>低於安全庫存商品</div>
             <div style={{ fontSize: '20px', fontWeight: 700, marginTop: '4px', color: metrics.warnings > 0 ? '#ef4444' : 'var(--text-primary)' }}>{metrics.warnings} 筆</div>
+          </div>
+        </div>
+
+        {/* 卡片 5 - 本月毛利 */}
+        <div className="glass-panel glow-hover" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', borderLeft: '4px solid var(--color-primary)' }}>
+          <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '12px', color: '#10b981' }}>
+            <TrendingUp size={24} />
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>本月毛利總額</div>
+            <div style={{ fontSize: '20px', fontWeight: 700, marginTop: '4px', color: 'var(--color-primary)' }}>${metrics.monthlyProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
         </div>
 
