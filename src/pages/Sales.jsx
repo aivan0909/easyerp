@@ -595,6 +595,15 @@ export default function Sales({ userDetails }) {
                   <button type="button" className="btn-secondary" onClick={handleAddOrderLine} style={{ padding: '4px 8px', fontSize: '12px' }}>+ 新增商品</button>
                 </div>
 
+                {/* 欄位標籤表頭 */}
+                <div style={{ display: 'flex', gap: '8px', padding: '4px 0', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  <div style={{ flex: 2 }}>商品品項</div>
+                  <div style={{ flex: 1 }}>數量</div>
+                  <div style={{ flex: 1.2 }}>單價</div>
+                  <div style={{ flex: 1.2 }}>小計金額</div>
+                  {newOrder.items.length > 1 && <div style={{ width: '24px' }}></div>}
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {newOrder.items.map((line, idx) => (
                     <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -604,8 +613,9 @@ export default function Sales({ userDetails }) {
                       </select>
                       <input style={{ flex: 1 }} type="number" required min="1" placeholder="數量" value={line.qty} onChange={(e) => handleOrderLineChange(idx, 'qty', e.target.value)} />
                       <input style={{ flex: 1.2 }} type="number" required placeholder="單價" value={line.price} onChange={(e) => handleOrderLineChange(idx, 'price', e.target.value)} />
+                      <input style={{ flex: 1.2, background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', cursor: 'not-allowed' }} type="text" readOnly value={`$${(parseFloat(line.qty || 0) * parseFloat(line.price || 0)).toLocaleString()}`} />
                       {newOrder.items.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveOrderLine(idx)} style={{ background: 'transparent', color: '#ef4444', padding: '4px' }}><Trash2 size={16} /></button>
+                        <button type="button" onClick={() => handleRemoveOrderLine(idx)} style={{ background: 'transparent', color: '#ef4444', padding: '4px', width: '24px' }}><Trash2 size={16} /></button>
                       )}
                     </div>
                   ))}

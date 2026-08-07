@@ -1112,6 +1112,37 @@ CREATE POLICY ooag_admin_select ON ooag_t
   FOR SELECT
   USING (is_admin());
 -- ============================================================
+-- migration_profit_view_v2.sql ??æ¯›åˆ©?±è¡¨è£œä??†å??ç¨±/è¦æ ¼
+-- ?¨ç½²?†å?ï¼?.. -> migration_rls_helpers.sql -> migration_profit_view_v2.sql
+--
+-- ?Ÿå?ï¼šprofit_report_v ?Ÿæœ¬?ªå¸¶ xmdl001(?†å?ç·¨è?)ï¼Œå?ç«¯ã€ŒéŠ·?®æ??©æ?ç´°æ??®ã€?-- ?„å??è??¼æ?ä½é?è¦é¡¯ç¤?imaa_t.imaa001(?†å??ç¨±)ï¼Œæ?è£œä? JOIN??-- ============================================================
+
+DROP VIEW IF EXISTS profit_report_v;
+
+CREATE VIEW profit_report_v WITH (security_invoker = true) AS
+SELECT
+  k.xmdkent        AS ent,
+  k.xmdkdocno      AS shipment_no,
+  k.xmdkdocdt      AS ship_date,
+  k.xmdk004        AS customer_code,
+  l.xmdlseq        AS line_seq,
+  l.xmdl001        AS item_code,
+  i.imaa001        AS item_name,   -- ?†å??ç¨±(å°æ??¨è??„ã€Œå??è??¼ã€?
+  i.imaa002        AS item_spec,   -- è¦æ ¼
+  l.xmdl002        AS qty,
+  l.xmdl003        AS unit_price,
+  l.xmdl004        AS revenue,
+  COALESCE(l.xmdl006, 0) AS cogs,
+  (l.xmdl004 - COALESCE(l.xmdl006, 0)) AS gross_profit,
+  CASE WHEN l.xmdl004 > 0
+    THEN round((l.xmdl004 - COALESCE(l.xmdl006, 0)) / l.xmdl004 * 100, 1)
+    ELSE NULL
+  END AS margin_pct
+FROM xmdl_t l
+JOIN xmdk_t k ON k.xmdkent = l.xmdlent AND k.xmdkdocno = l.xmdldocno
+LEFT JOIN imaa_t i ON i.imaaent = l.xmdlent AND i.imaacode = l.xmdl001
+WHERE k.xmdkstatus = '1';
+-- ============================================================
 -- ERP ç³»çµ± ??Row Level Security (RLS) ?¿ç?
 -- ============================================================
 

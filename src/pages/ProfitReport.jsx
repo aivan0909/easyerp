@@ -139,7 +139,12 @@ export default function ProfitReport({ userDetails }) {
                           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{row.ship_date}</div>
                         </td>
                         <td style={{ padding: '12px 8px' }}>
-                          <div style={{ fontWeight: 500 }}>{row.item_code}</div>
+                          <div style={{ fontWeight: 600 }}>{row.item_name || row.item_code}</div>
+                          {row.item_spec && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              規格: {row.item_spec}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '12px 8px' }}>{parseFloat(row.qty).toLocaleString()} 片</td>
                         <td style={{ padding: '12px 8px' }}>${parseFloat(row.revenue || 0).toLocaleString()}</td>
