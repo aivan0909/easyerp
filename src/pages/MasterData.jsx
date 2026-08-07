@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { Package, User, Truck, Plus, Edit2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Package, User, Truck, Home, Plus, Edit2, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function MasterData({ userDetails }) {
-  const [activeTab, setActiveTab] = useState('items'); // items, customers, vendors
+  const [activeTab, setActiveTab] = useState('items'); // items, customers, vendors, warehouses
   const [items, setItems] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -20,7 +21,9 @@ export default function MasterData({ userDetails }) {
     // 商品欄位
     imaacode: '', imaa001: '', imaa002: '', imaa003: '預設分類', imaa004: '片', imaa005: 0, imaa006: 0, imaa007: 0,
     // 客戶/供應商欄位
-    code: '', name: '', taxId: '', contact: '', phone: '', address: '', paymentTerms: '30天月結'
+    code: '', name: '', taxId: '', contact: '', phone: '', address: '', paymentTerms: '30天月結',
+    // 倉庫欄位
+    inaacode: '', inaa001: '', inaastatus: '1'
   });
 
   const ent = userDetails.ooagent;
@@ -49,6 +52,11 @@ export default function MasterData({ userDetails }) {
         if (!isAdmin) q = q.eq('vndaent', ent);
         const { data } = await q;
         setVendors(data || []);
+      } else if (activeTab === 'warehouses') {
+        let q = supabase.from('inaa_t').select('*').order('inaacode');
+        if (!isAdmin) q = q.eq('inaaent', ent);
+        const { data } = await q;
+        setWarehouses(data || []);
       }
     } catch (err) {
       setErrorMsg('載入資料失敗: ' + err.message);
@@ -61,7 +69,8 @@ export default function MasterData({ userDetails }) {
     setIsEditMode(false);
     setFormData({
       imaacode: '', imaa001: '', imaa002: '', imaa003: '常規', imaa004: '片', imaa005: 0, imaa006: 0, imaa007: 0,
-      code: '', name: '', taxId: '', contact: '', phone: '', address: '', paymentTerms: '月結30天'
+      code: '', name: '', taxId: '', contact: '', phone: '', address: '', paymentTerms: '月結30天',
+      inaacode: '', inaa001: '', inaastatus: '1'
     });
     setShowModal(true);
   }
@@ -100,6 +109,12 @@ export default function MasterData({ userDetails }) {
         phone: record.vnda004 || '',
         address: record.vnda005 || '',
         paymentTerms: record.vnda006 || '月結30天'
+      });
+    } else if (activeTab === 'warehouses') {
+      setFormData({
+        inaacode: record.inaacode,
+        inaa001: record.inaa001 || '',
+        inaastatus: record.inaastatus || '1'
       });
     }
     setShowModal(true);
@@ -204,6 +219,36 @@ export default function MasterData({ userDetails }) {
           if (error) throw error;
           setSuccessMsg(`供應商 ${formData.name} 建立成功！`);
         }
+      } else if (activeTab === 'warehouses') {
+        if (isEditMode) {
+          // 更新倉庫
+          const { error } = await supabase.from('inaa_t')
+            .update({
+              inaa001: formData.inaa001,
+              inaastatus: formData.inaastatus
+            })
+            .match({ inaaent: ent, inaacode: formData.inaacode });
+          if (error) throw error;
+          setSuccessMsg(`倉庫 ${formData.inaa001} 更新成功！`);
+        } else {
+          // 新增倉庫 - 檢查代碼是否重複
+          const { data: existing } = await supabase.from('inaa_t')
+            .select('inaacode')
+            .match({ inaaent: ent, inaacode: formData.inaacode.trim() })
+            .maybeSingle();
+          if (existing) {
+            throw new Error('倉庫代碼已存在，請使用其他代碼！');
+          }
+
+          const { error } = await supabase.from('inaa_t').insert({
+            inaaent: ent,
+            inaacode: formData.inaacode.trim(),
+            inaa001: formData.inaa001,
+            inaastatus: '1'
+          });
+          if (error) throw error;
+          setSuccessMsg(`倉庫 ${formData.inaa001} 建立成功！`);
+        }
       }
 
       setShowModal(false);
@@ -254,6 +299,12 @@ export default function MasterData({ userDetails }) {
         >
           <Truck size={16} /> <span>供應商檔案</span>
         </button>
+        <button
+          onClick={() => { setActiveTab('warehouses'); setSuccessMsg(''); setErrorMsg(''); }}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', fontSize: '14px', background: activeTab === 'warehouses' ? 'var(--bg-tertiary)' : 'transparent', color: activeTab === 'warehouses' ? 'var(--color-primary)' : 'var(--text-secondary)' }}
+        >
+          <Home size={16} /> <span>倉庫檔案</span>
+        </button>
       </div>
 
       {/* 內容區塊 */}
@@ -264,6 +315,7 @@ export default function MasterData({ userDetails }) {
             {activeTab === 'items' && '商品列表'}
             {activeTab === 'customers' && '客戶列表'}
             {activeTab === 'vendors' && '供應商列表'}
+            {activeTab === 'warehouses' && '倉庫列表'}
           </h3>
           <button className="btn-primary" onClick={openCreateModal} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', fontSize: '13px' }}>
             <Plus size={16} /> <span>新增資料</span>
@@ -390,6 +442,42 @@ export default function MasterData({ userDetails }) {
               </table>
             )}
 
+            {/* ==================== 4. 倉庫列表 ==================== */}
+            {activeTab === 'warehouses' && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                    <th style={{ padding: '12px 8px' }}>倉庫代碼</th>
+                    <th style={{ padding: '12px 8px' }}>倉庫名稱</th>
+                    <th style={{ padding: '12px 8px' }}>狀態</th>
+                    <th style={{ padding: '12px 8px', width: '80px' }}>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {warehouses.length === 0 ? (
+                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>暫無倉庫資料</td></tr>
+                  ) : (
+                    warehouses.map(wh => (
+                      <tr key={wh.inaacode} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '12px 8px', fontWeight: 600 }}>{wh.inaacode}</td>
+                        <td style={{ padding: '12px 8px' }}>{wh.inaa001}</td>
+                        <td style={{ padding: '12px 8px' }}>
+                          {wh.inaastatus === '1' ? (
+                            <span style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>啟用</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>停用</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <button onClick={() => openEditModal(wh)} style={{ background: 'transparent', color: 'var(--color-primary)', padding: '6px' }}><Edit2 size={16} /></button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+
           </div>
         )}
 
@@ -454,8 +542,8 @@ export default function MasterData({ userDetails }) {
               {(activeTab === 'customers' || activeTab === 'vendors') && (
                 <>
                   <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>編號</label>
-                    <input type="text" required disabled={isEditMode} placeholder="如: C001" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
+                     <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>編號</label>
+                     <input type="text" required disabled={isEditMode} placeholder="如: C001" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>名稱</label>
@@ -485,6 +573,29 @@ export default function MasterData({ userDetails }) {
                     <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>地址</label>
                     <input type="text" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
                   </div>
+                </>
+              )}
+
+              {/* ==================== 倉庫表單 ==================== */}
+              {activeTab === 'warehouses' && (
+                <>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>倉庫代碼</label>
+                    <input type="text" required disabled={isEditMode} placeholder="如: WH01" value={formData.inaacode} onChange={e => setFormData({ ...formData, inaacode: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>倉庫名稱</label>
+                    <input type="text" required value={formData.inaa001} onChange={e => setFormData({ ...formData, inaa001: e.target.value })} />
+                  </div>
+                  {isEditMode && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>倉庫狀態</label>
+                      <select value={formData.inaastatus} onChange={e => setFormData({ ...formData, inaastatus: e.target.value })}>
+                        <option value="1">啟用</option>
+                        <option value="0">停用</option>
+                      </select>
+                    </div>
+                  )}
                 </>
               )}
 
